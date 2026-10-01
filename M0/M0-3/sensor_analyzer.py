@@ -42,10 +42,14 @@ for v in data:
     acc += (v - mean) ** 2
 std = math.sqrt(acc / len(data))
 # --- 剔除离群值 ---
-# 修复缺陷3：按 |v-mean| > 2*std 的绝对值判定，同时剔除偏大与偏小离群
-for v in data:
+# 修复缺陷3：|v-mean| > 2*std 的绝对值判定（偏大偏小都剔除）
+# 修复缺陷4：遍历时不再修改 data（改填充保留列表 cleaned）
+# 修复缺陷5：cleaned 填充为 (time, value) 对，供后续输出
+cleaned = []
+for t, v in zip(times, data):
     if abs(v - mean) > 2 * std:
-        data.remove(v)
+        continue  # 离群值剔除
+    cleaned.append((t, v))
 # --- 输出清洗后的数据 ---
 output_path = OUTPUT_FILE  # 修复缺陷6：写当前工作目录，不再写死 /out/
 f = open(output_path, "w")
