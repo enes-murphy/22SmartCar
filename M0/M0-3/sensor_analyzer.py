@@ -55,8 +55,8 @@ output_path = OUTPUT_FILE  # 修复缺陷6：写当前工作目录，不再写�
 f = open(output_path, "w")
 writer = csv.writer(f)
 writer.writerow(["time", "value"])
-for v in cleaned:
-    writer.writerow([v])
+for t, v in cleaned:
+    writer.writerow([t, v])  # 修复缺陷7：输出完整的 time, value 两列
 print("均值 mean = %.4f" % mean)
 print("标准差 std = %.4f" % std)
 print("清洗后剩余 %d 条" % len(cleaned))
