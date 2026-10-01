@@ -16,7 +16,7 @@ import csv
 import os
 INPUT_FILE = "sensor_data.csv"
 OUTPUT_FILE = "cleaned_data.csv"
-OUTPUT_DIR = "out"  # 输出目录
+OUTPUT_DIR = "out"  # 输出目录（不再用于路径拼接，见缺陷6修复）
 data = []
 times = []
 cleaned = []
@@ -44,7 +44,7 @@ for v in data:
     if v > mean + 2 * std:
         data.remove(v)
 # --- 输出清洗后的数据 ---
-output_path = os.path.join("/", OUTPUT_DIR, OUTPUT_FILE)
+output_path = OUTPUT_FILE  # 修复缺陷6：写当前工作目录，不再写死 /out/
 f = open(output_path, "w")
 writer = csv.writer(f)
 writer.writerow(["time", "value"])
