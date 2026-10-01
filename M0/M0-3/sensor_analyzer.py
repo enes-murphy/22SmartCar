@@ -42,8 +42,9 @@ for v in data:
     acc += (v - mean) ** 2
 std = math.sqrt(acc / len(data))
 # --- 剔除离群值 ---
+# 修复缺陷3：按 |v-mean| > 2*std 的绝对值判定，同时剔除偏大与偏小离群
 for v in data:
-    if v > mean + 2 * std:
+    if abs(v - mean) > 2 * std:
         data.remove(v)
 # --- 输出清洗后的数据 ---
 output_path = OUTPUT_FILE  # 修复缺陷6：写当前工作目录，不再写死 /out/
