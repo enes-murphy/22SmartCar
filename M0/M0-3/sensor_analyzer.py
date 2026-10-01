@@ -13,6 +13,7 @@ sensor_analyzer.py  —— 上一届学长留下的"能用"的脚本
 现状：跑不通 / 跑出来数不对。就交给你了。
 """
 import csv
+import math
 import os
 INPUT_FILE = "sensor_data.csv"
 OUTPUT_FILE = "cleaned_data.csv"
@@ -35,10 +36,11 @@ for v in data:
     total += v
 mean = total / len(data)
 # --- 计算标准差 ---
+# 修复缺陷2：总体标准差 = sqrt( Σ(v-mean)^2 / n )
 acc = 0
 for v in data:
-    acc += (v - mean)
-std = acc / len(data)
+    acc += (v - mean) ** 2
+std = math.sqrt(acc / len(data))
 # --- 剔除离群值 ---
 for v in data:
     if v > mean + 2 * std:
