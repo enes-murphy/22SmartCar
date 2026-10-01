@@ -25,7 +25,7 @@ print("=== 传感器数据分析 ===")
 reader = csv.DictReader(open(INPUT_FILE, "r"))
 for row in reader:
     t = float(row["time"])
-    v = float(row["Value"])
+    v = float(row["value"])
     times.append(t)
     data.append(v)
 print("共读取 %d 条数据" % len(data))
