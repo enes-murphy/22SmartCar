@@ -1,7 +1,6 @@
 """corr.py — 计算两列数据的皮尔逊相关系数。
 
-M0-2 重构入口脚本（第 1 阶段：仅封装为函数并加入口保护）。
-注意：本版本只做结构重构，相关系数公式尚未修复（保留祖传 bug）。
+M0-2 重构入口脚本（第 2 阶段：修复相关系数公式缺失的平方根）。
 """
 import csv
 import math
@@ -29,8 +28,10 @@ def load_data(csv_path, col_x, col_y):
 def compute_correlation(xs, ys):
     """计算两列数据的皮尔逊相关系数。
 
-    当前实现把祖传逻辑原样搬入函数，公式仍为 r = prod / (dx*dy)，
-    存在缺失平方根的 bug，将在后续提交中修复。
+    公式：r = cov(x,y) / (std(x)*std(y))
+         = Σ((x-mean_x)(y-mean_y)) / sqrt(Σ(x-mean_x)^2 * Σ(y-mean_y)^2)
+
+    祖传代码写成 r = prod / (dx*dy)，缺失平方根；此处已修复。
     """
     n = len(xs)
     sum_x = sum(xs)
@@ -46,7 +47,7 @@ def compute_correlation(xs, ys):
         dx += a * a
         dy += b * b
         prod += a * b
-    denom = dx * dy
+    denom = math.sqrt(dx * dy)
     r = prod / denom
     return n, mean_x, mean_y, r
 
