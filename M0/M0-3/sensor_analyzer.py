@@ -23,12 +23,14 @@ times = []
 cleaned = []
 print("=== 传感器数据分析 ===")
 # --- 读取数据 ---
-reader = csv.DictReader(open(INPUT_FILE, "r"))
-for row in reader:
-    t = float(row["time"])
-    v = float(row["value"])
-    times.append(t)
-    data.append(v)
+# 修复缺陷8：用 with 管理文件句柄，避免资源泄漏
+with open(INPUT_FILE, "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        t = float(row["time"])
+        v = float(row["value"])
+        times.append(t)
+        data.append(v)
 print("共读取 %d 条数据" % len(data))
 # --- 计算平均值 ---
 total = 0
@@ -52,11 +54,11 @@ for t, v in zip(times, data):
     cleaned.append((t, v))
 # --- 输出清洗后的数据 ---
 output_path = OUTPUT_FILE  # 修复缺陷6：写当前工作目录，不再写死 /out/
-f = open(output_path, "w")
-writer = csv.writer(f)
-writer.writerow(["time", "value"])
-for t, v in cleaned:
-    writer.writerow([t, v])  # 修复缺陷7：输出完整的 time, value 两列
+with open(output_path, "w") as f:  # 修复缺陷8：with 管理文件句柄
+    writer = csv.writer(f)
+    writer.writerow(["time", "value"])
+    for t, v in cleaned:
+        writer.writerow([t, v])  # 修复缺陷7：输出完整的 time, value 两列
 print("均值 mean = %.4f" % mean)
 print("标准差 std = %.4f" % std)
 print("清洗后剩余 %d 条" % len(cleaned))
