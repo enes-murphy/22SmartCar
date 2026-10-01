@@ -30,10 +30,10 @@ def test_perfect_negative_correlation():
     assert math.isclose(r, -1.0, abs_tol=1e-6)
 
 
-def test_uncorrelated_series():
-    """无相关序列 r 接近 0。"""
-    _, _, _, r = corr.compute_correlation([1, 2, 3], [2, 2, 2.5])
-    assert abs(r) < 0.5
+def test_permutation_negative_correlation():
+    """[1,2,3,4] 与 [4,1,2,3] 为确定负弱相关，手算 r = -0.2。"""
+    _, _, _, r = corr.compute_correlation([1, 2, 3, 4], [4, 1, 2, 3])
+    assert math.isclose(r, -0.2, abs_tol=1e-6)
 
 
 def test_zero_variance_raises():
