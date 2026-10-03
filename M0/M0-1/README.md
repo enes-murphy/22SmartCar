@@ -37,8 +37,8 @@ sudo apt update
 # 通过什么方法 / 查了什么资料
 
 - 主要看官方文档：Ubuntu、ROS2、WSL 官网那几篇，跟着一步步来。
-- 装wsl的时候和Ubuntu的时候我跟着b站教程进行自学。
-- 卡住的时候问了同学，也找 AI 帮忙定位问题。
+- 装wsl的时候和Ubuntu的时候我跟着b站教程进行自学。Ubuntu安装：【VMware虚拟机下载安装配置Ubuntu（乌班图）操作系统！附软件安装包！】https://www.bilibili.com/video/BV1FKKA6bEDz?vd_source=6ec9242c77cefc0ad49094109bfd0936；wsl安装：【Windows电脑安装WSL【不用命令行，10分钟完成】】https://www.bilibili.com/video/BV1y8VJ6hEAs?vd_source=6ec9242c77cefc0ad49094109bfd0936
+- 卡住的时候问了之前做过Ubuntu双系统的同学，也找 AI 帮忙定位问题。
 
 # 完成了什么
 
