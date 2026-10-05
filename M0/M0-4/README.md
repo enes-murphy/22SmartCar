@@ -102,7 +102,7 @@ python3 scheduler.py --config cycle.yaml
 输出（可读错误，非 0 退出，不抛栈回溯）：
 
 ```
-错误: 检测到依赖环: B -> A -> A
+错误: 检测到依赖环: A -> B -> A
 ```
 
 ### 示例 4：用 json 配置

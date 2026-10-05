@@ -111,18 +111,20 @@ def validate_tasks(tasks):
 def topo_order(mapping):
     """拓扑排序，返回依赖在前、被依赖者在后的顺序；检测到环则报错。"""
     result = []
-    visiting = set()
+    visiting = []      # 当前 DFS 的访问栈（有序），用于还原完整的环
     done = set()
 
     def visit(name):
         if name in done:
             return
         if name in visiting:
-            raise ValueError(f"检测到依赖环: {' -> '.join(list(visiting) + [name])}")
-        visiting.add(name)
+            i = visiting.index(name)
+            cycle = visiting[i:] + [name]
+            raise ValueError(f"检测到依赖环: {' -> '.join(cycle)}")
+        visiting.append(name)
         for d in mapping[name]["dependencies"]:
             visit(d)
-        visiting.remove(name)
+        visiting.pop()
         done.add(name)
         result.append(name)
 
@@ -194,6 +196,7 @@ def run_schedule(mapping, order, timeout, seed):
 
         ended_at[name] = time.time()
         used_duration[name] = task["duration"] * tr
+        attempts[name] = tr
 
         if timed_out:
             break
@@ -201,7 +204,6 @@ def run_schedule(mapping, order, timeout, seed):
             status[name] = "SUCCESS"
         else:
             status[name] = "SKIPPED"
-        attempts[name] = tr
 
     if timed_out:
         stamp_timed_out()
