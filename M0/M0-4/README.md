@@ -111,7 +111,7 @@ python3 scheduler.py --config cycle.yaml
 python3 scheduler.py --config tasks_demo.json --seed 1
 ```
 
-## 实现要点（几句话）
+## 实现要点
 
 - **拓扑排序**：用 DFS 求执行顺序，天然处理分叉（一个任务被多个任务依赖）和汇合（一个任务依赖多个前置），遇到环直接报错。
 - **依赖失败传播**：只要前置里有 `SKIPPED`，自己就不执行、直接 `SKIPPED`。
