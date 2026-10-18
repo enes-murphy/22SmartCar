@@ -46,3 +46,24 @@ sudo apt update
 - Python / C/C++ 工具链都可用
 - git 配好了身份，仓库建起来，能推到 GitHub
 - SSH 密钥弄好，能远程登录别的机器
+
+# 备注
+cd ~
+explorer.exe .
+//打开wsl文件显示的就是你 WSL 的**家目录** `/home/enes`
+
+//eg.m02
+cd /home/enes/22SmartCar/M0/M0-2
+source ../.venv/bin/activate
+python3 corr.py --config /home/enes/materials/materials/M0-2/config.yaml
+
+//eg.m03
+cd /home/enes/22SmartCar/M0/M0-3
+source ../.venv/bin/activate
+python3 sensor_analyzer.py --input /home/enes/materials/materials/M0-3/sensor_data.csv --output cleaned_data.csv
+
+//eg.m04
+cd /home/enes/22SmartCar/M0/M0-4
+source ../.venv/bin/activate
+python3 scheduler.py --config /home/enes/materials/materials/M0-4/tasks.yaml --seed 42 --report report.json
+
