@@ -8,4 +8,8 @@ install(DIRECTORY urdf config launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY ../../worlds
+  DESTINATION share/${PROJECT_NAME}
+)
+
 ament_package()

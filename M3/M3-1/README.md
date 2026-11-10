@@ -13,8 +13,8 @@
 - [x] 第 1 步：读车模，核对轴距、轮距、轮半径、最大转向角。
 - [x] 第 2 步：计算最小转弯半径，设计正方形转弯方法（理论方案，待仿真验证）。
 - [x] 第 3 步：创建并构建 `smart_car_description` ROS2 包；Xacro 已成功展开。
-- [ ] 第 4 步：创建空地 Gazebo 世界和启动文件。
-- [ ] 第 5 步：确认 `/cmd_vel`、`/odom`、`/tf` 和 `/gazebo/model_states`。
+- [x] 第 4 步：创建空地 Gazebo 世界和启动文件，小车与雷达已在桌面仿真显示。
+- [x] 第 5 步：确认 `/cmd_vel`、`/odom`、`/tf` 和 `/gazebo/model_states`；完成低速直行冒烟测试。
 - [ ] 第 6 步：实现参数化正方形驾驶脚本。
 - [ ] 第 7 步：实现两路轨迹记录，完成 10 次实验。
 - [ ] 第 8 步：计算闭环误差并绘图。
@@ -82,3 +82,32 @@ xacro src/smart_car_description/urdf/smart_car.urdf.xacro -o /tmp/smart_car_m3_1
 ```
 
 构建成功后应显示 `1 package finished`，`ros2 pkg prefix` 应指向 `M3-1/install/smart_car_description`。生成的 URDF 中应有 11 个 link、10 个 joint；这只证明模型可解析，**不代表仿真控制与里程计已经跑通**。
+
+## 启动最小仿真
+
+`worlds/square.world` 定义了 20 m × 20 m 的平地、灯光和物理引擎；`launch/sim.launch.py` 启动 Gazebo、`robot_state_publisher`、生成车模，然后依次加载关节状态广播器和阿克曼控制器。世界插件将 Gazebo 真值话题映射到题目约定的 `/gazebo/model_states`。
+
+```bash
+cd M3/M3-1
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select smart_car_description
+source install/setup.bash
+ros2 launch smart_car_description sim.launch.py
+```
+
+现场首次验证：Gazebo 出现小车和雷达，`/scan`、`/tf`、`/model_states` 已发布，**但 `/odom` 缺失**。原因是启动文件当时尚未加载阿克曼控制器。第二次验证发现系统未安装 `ros-humble-joint-state-broadcaster`，补装后两个控制器均显示 `Configured and activated`。最新话题列表含 `/odom`、`/gazebo/model_states`、`/scan`、`/tf`、`/tf_static`；`/odom` 单条消息实测 `header.frame_id: odom`、`child_frame_id: base_footprint`。尚需实际查询 TF 两端和控制小车运动。
+
+旧版终端缺少 `ros2 control` CLI 插件，诊断时可直接调用控制器管理服务：
+
+```bash
+ros2 service call /controller_manager/list_controllers controller_manager_msgs/srv/ListControllers '{}'
+```
+
+期待看到 `joint_state_broadcaster` 与 `ackermann_steering_controller` 均为 `active`，并在 `ros2 topic list` 中看到 `/odom` 与 `/gazebo/model_states`。如果失败，请保留 spawner 的日志，不要把控制器失败误判为 Gazebo 没安装。
+
+### 现场验证记录
+
+- 两个控制器均显示 `Configured and activated`；`/cmd_vel` 的类型为 `geometry_msgs/msg/Twist`，订阅者是阿克曼控制器。
+- TF 实测：`odom → base_footprint` 随时间更新；`base_link → lidar_link` 固定平移 `[0, 0, 0.085] m`，旋转为零。
+- 以 `0.1 m/s`、10 Hz 发布 30 次直行命令后，`/odom` 的 x 从约 `-0.0456 m` 变为 `0.3436 m`，差约 `0.389 m`；y 基本不变。这证明控制链路可用，**尚不能作为漂移误差**，因为本次没有同步采集前后 Gazebo 真值。
+- 下一步采集 `/odom` 与 `/gazebo/model_states` 的同步轨迹，并统一时间与起点；只有两者比较才可评估里程计误差。
