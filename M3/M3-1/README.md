@@ -12,7 +12,7 @@
 
 - [x] 第 1 步：读车模，核对轴距、轮距、轮半径、最大转向角。
 - [x] 第 2 步：计算最小转弯半径，设计正方形转弯方法（理论方案，待仿真验证）。
-- [ ] 第 3 步：创建 `smart_car_description` ROS2 包。
+- [x] 第 3 步：创建并构建 `smart_car_description` ROS2 包；Xacro 已成功展开。
 - [ ] 第 4 步：创建空地 Gazebo 世界和启动文件。
 - [ ] 第 5 步：确认 `/cmd_vel`、`/odom`、`/tf` 和 `/gazebo/model_states`。
 - [ ] 第 6 步：实现参数化正方形驾驶脚本。
@@ -58,7 +58,7 @@ R_min ≈ L / tan(δ) = 0.28 / tan(30°) ≈ 0.485 m
 
 ## 当前环境依赖
 
-本机已有 ROS 2 Humble 和 `colcon`，但尚缺 Gazebo ROS、`gazebo_ros2_control`、阿克曼控制器及 `xacro`。需要有管理员权限的终端执行：
+本机已有 ROS 2 Humble 和 `colcon`；Gazebo ROS、`gazebo_ros2_control`、阿克曼控制器及 `xacro` 已安装。若在新机器上复现，需要有管理员权限的终端执行：
 
 ```bash
 sudo apt update
@@ -66,3 +66,19 @@ sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control ros-h
 ```
 
 安装后用 `ros2 pkg prefix gazebo_ros`、`ros2 pkg prefix gazebo_ros2_control`、`ros2 pkg prefix ackermann_steering_controller` 和 `ros2 pkg prefix xacro` 逐一确认。若实际仿真运行在另一台机器或 WSL，应在那套 Ubuntu 环境执行这些命令。
+
+## 将车模组装成 ROS 2 包
+
+`package.xml` 是包的身份及依赖清单；`CMakeLists.txt` 告诉构建工具把 `urdf/`、`config/`、`launch/` 放入安装目录。因此 Xacro 中的 `$(find smart_car_description)` 才能找到控制器 YAML。
+
+在本目录运行：
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select smart_car_description
+source install/setup.bash
+ros2 pkg prefix smart_car_description
+xacro src/smart_car_description/urdf/smart_car.urdf.xacro -o /tmp/smart_car_m3_1.urdf
+```
+
+构建成功后应显示 `1 package finished`，`ros2 pkg prefix` 应指向 `M3-1/install/smart_car_description`。生成的 URDF 中应有 11 个 link、10 个 joint；这只证明模型可解析，**不代表仿真控制与里程计已经跑通**。
