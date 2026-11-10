@@ -19,7 +19,11 @@ def generate_launch_description():
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(str(gazebo_share / "launch" / "gazebo.launch.py")),
-        launch_arguments={"world": str(world), "verbose": "true"}.items(),
+        launch_arguments={
+            "world": str(world),
+            "verbose": "true",
+            "params_file": str(share / "config" / "gazebo_clock.yaml"),
+        }.items(),
     )
     robot_state_publisher = Node(
         package="robot_state_publisher",

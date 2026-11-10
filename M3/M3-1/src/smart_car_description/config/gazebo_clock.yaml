@@ -1,0 +1,4 @@
+gazebo:
+  ros__parameters:
+    # ModelStates has no header; a faster /clock reduces receipt-time quantization.
+    publish_rate: 100.0
