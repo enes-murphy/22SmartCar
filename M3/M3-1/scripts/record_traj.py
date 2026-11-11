@@ -103,7 +103,8 @@ def main():
         recorder.close_files()
         print(f"Saved {recorder.counts['odom']} odom and {recorder.counts['truth']} truth rows to {args.out}")
         recorder.destroy_node()
-        rclpy.shutdown()
+        # Ctrl+C may already have shut down the default ROS context.
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

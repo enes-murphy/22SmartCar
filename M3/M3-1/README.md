@@ -15,7 +15,7 @@
 - [x] 第 3 步：创建并构建 `smart_car_description` ROS2 包；Xacro 已成功展开。
 - [x] 第 4 步：创建空地 Gazebo 世界和启动文件，小车与雷达已在桌面仿真显示。
 - [x] 第 5 步：确认 `/cmd_vel`、`/odom`、`/tf` 和 `/gazebo/model_states`；完成低速直行冒烟测试。
-- [ ] 第 6 步：实现参数化正方形驾驶脚本。
+- [x] 第 6 步：实现参数化圆角方形驾驶脚本（待 Gazebo 实测确认）。
 - [ ] 第 7 步：实现两路轨迹记录，完成 10 次实验。
 - [ ] 第 8 步：计算闭环误差并绘图。
 - [ ] 第 9 步：生成、标注并解释 TF 树。
@@ -52,7 +52,7 @@ R_min ≈ L / tan(δ) = 0.28 / tan(30°) ≈ 0.485 m
 90° 圆弧长度 ≈ πR/2 ≈ 0.762 m
 ```
 
-方案：始终前进，直线与四段 90° 圆弧交替，形成外框约 2 m × 2 m 的圆角正方形轨迹；若取半径 0.485 m，每边可留 `2−2R ≈ 1.03 m` 直线。角点不会是数学意义的尖角。轴距公式只是初值：两前轮实际转角不同、控制器接口可能有约束，必须以 Gazebo 实测轨迹校准。
+方案：始终前进，直线与四段 90° 圆弧交替，形成外框约 2 m × 2 m 的圆角正方形轨迹。单轨公式得到的 `0.485 m` 只是车体中心的理论下界：转弯时内侧前轮转角更大，还要加半个前轮距 `0.09 m`，所以中心线半径至少约 `0.575 m`。第一次试跑选 `R = 0.65 m`，每边直线段为 `2−2R = 0.70 m`。角点不会是数学意义的尖角。车轮打滑、控制器跟踪延迟等仍可能让实测半径偏离命令值，必须以 Gazebo 轨迹检查。
 
 后续实验统一以 `/gazebo/model_states` 记录的起点和终点计算真实闭环偏差；`/odom` 只用于与真值比较，不用真值修正控制器的里程计。
 
@@ -144,3 +144,51 @@ ros2 topic pub -r 10 -t 30 --qos-reliability best_effort /cmd_vel geometry_msgs/
 ```
 
 最后检查 `head -n 4 logs/straight_01/odom.csv` 与 `head -n 4 logs/straight_01/truth.csv`。这只是记录功能试验，尚未完成 2 m 正方形和 10 次统计。
+
+## 下一课：第一圈圆角方形试跑
+
+`scripts/drive_square.py` 以 20 Hz 向 `/cmd_vel` 发送速度命令。直线时 `linear.x = 0.1 m/s`、`angular.z = 0`；转弯时保持前进，用 `angular.z = v/R` 指定转向速度。每段的持续时间按 `距离÷速度` 计算，**不读取 `/odom` 作为停止条件**。这样试跑可以揭示命令、里程计与 Gazebo 真值之间的真实差异，避免里程计自己决定何时“走够一圈”。脚本用 Gazebo 仿真时间计段长，仿真暂停时不会偷偷走完下一段。
+
+车模的轴距、轮距和转向限位决定了半径下界。默认 `--side 2.0 --radius 0.65 --speed 0.1 --laps 1` 的一圈含四段 `0.70 m` 直线和四段 `90°` 圆弧，理论约 69 秒仿真时间。`--side` 指中心线轨迹的外框宽度，不是每段直线的长度。
+
+先重新启动仿真（终端 A，保持运行）：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch smart_car_description sim.launch.py
+```
+
+打开第二个 Ubuntu 终端（终端 B），先开始记录。`--duration 150` 留出切换终端和观察时间；驾驶结束后可按 `Ctrl+C` 提前保存：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/record_traj.py --duration 150 --out logs/square_trial_01
+```
+
+打开第三个 Ubuntu 终端（终端 C），开始第一圈：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/drive_square.py --side 2.0 --radius 0.65 --speed 0.1 --laps 1
+```
+
+看到 `Run complete` 后回终端 B 按 `Ctrl+C`，确认出现 `Saved ... odom and ... truth rows`。终端 A 的 Gazebo 可以暂时保持运行。此时只检查第一圈的实际运动形状和两路文件是否完整；正式的 10 次统计需另做，试跑数据不计入结果。
+
+### 第一圈试跑记录（调试数据，不计入正式统计）
+
+现场完成四段直线和四段左转，`drive_square.py` 输出 `Run complete`。记录器保存 4756 行里程计与 1902 行 Gazebo 真值，两个 CSV 的时间列均严格递增，范围约 95 秒。按 `Ctrl+C` 后曾在 `rclpy.shutdown()` 报重复关闭错误；文件已经在报错前关闭并保存。记录器和驾驶脚本现都改用 `rclpy.try_shutdown()` 处理这种退出路径。
+
+两条轨迹分别平移并旋转到自身起点后，在 [`results/square_trial_01.png`](results/square_trial_01.png) 中按等比例坐标与理想指令轨迹叠加。终点数据如下；角度是整圈展开后的总转角，不能只看原始 `theta` 的末值（它会在 ±π 处折返）。
+
+| 指标 | `/odom` | Gazebo 真值 |
+| :-- | --: | --: |
+| 终点距各自起点 | 0.620 m | 0.345 m |
+| 累积转角 | 327.2° | 380.8° |
+
+两路起点对齐后的终点相距约 **0.925 m**。这里的 0.345 m 是车实际没有回到起点的闭环偏差；0.925 m 才是本次里程计与真值在终点的估计差异。按试跑开始时间粗略分段，四次转弯每次都约为里程计 82°、真值 95°，而指令期望 90°。重复出现的方向性偏差提示优先检查转向几何、控制器里程计计算和轮地接触；单凭这一圈还不能断言是打滑或某个参数错误。正式实验前要先诊断转弯偏差，再明确 10 次试验的统一起止条件。
