@@ -216,3 +216,46 @@ python3 scripts/drive_square.py --radius 0.65 --speed 0.1 --turn-only
 ```
 
 终端 C 显示 `Run complete` 后，回终端 B 按 `Ctrl+C` 保存。期待 `logs/turn_diag_01/` 出现 `odom.csv`、`truth.csv`、`joints.csv`。其中 `joints.csv` 的前两列关节位置是弧度，代表左右前轮转向角；后两列是后轮旋转角，不是车身航向。比较三者可区分转向命令未执行、车身运动偏离车轮几何，以及里程计计算偏差。
+
+### 修正前的诊断结果
+
+`turn_diag_01` 实际保存 2934 条里程计、1173 条真值和 2935 条关节状态。根据前轮转角大于 `0.05 rad` 的时段识别转弯，约为记录时间 `11.4–21.6 s`；稳定段用中位数求得：
+
+| 量 | 理想几何预测 | 仿真实际 |
+| :-- | --: | --: |
+| 左前轮转角 | 26.6° | 20.7° |
+| 右前轮转角 | 20.7° | 26.6° |
+| 车身转过角度 | 90° | Gazebo 真值 95.9°；`/odom` 81.5° |
+
+图见 [`results/turn_diag_01.png`](results/turn_diag_01.png)。前轮角度恰好左右对调，证据指向控制器轮名数组的顺序，而不是前轮没有转动。[ROS 2 Humble 的控制器源码](https://raw.githubusercontent.com/ros-controls/ros2_controllers/humble/steering_controllers_library/src/steering_odometry.cpp)在 Ackermann 模式输出 `{右轮, 左轮}` 的牵引速度和转向角，里程计也按这个顺序解释反馈。原始 YAML 的两个数组都是 `{左轮, 右轮}`，所以现改成 `{右轮, 左轮}`。这解释了明确的配置错误，但是否能消除 95.9° 与 81.5° 的差距，需要下一次相同命令实测。
+
+### 修正后复测
+
+由于控制器启动时读取 YAML，先到运行 Gazebo 的终端 A 按 `Ctrl+C`，等它退出。ROS 2 包已重新构建，安装目录中的 YAML 已确认是右轮在前；随后在终端 A 执行：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch smart_car_description sim.launch.py
+```
+
+控制器启动成功后，终端 B 记录到**新目录**，保留修正前数据以便比较：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/record_traj.py --duration 90 --joints --out logs/turn_diag_02
+```
+
+终端 C 再执行同一个转弯命令：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/drive_square.py --radius 0.65 --speed 0.1 --turn-only
+```
+
+看到 `Run complete` 后，在终端 B 按 `Ctrl+C` 保存。复测要比较左右前轮转角是否恢复为约 `26.6° / 20.7°`，以及两种车身转角是否更接近命令的 90°。诊断数据不计入 10 次正式闭环统计。
