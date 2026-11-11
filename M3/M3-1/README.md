@@ -273,3 +273,53 @@ python3 scripts/drive_square.py --radius 0.65 --speed 0.1 --turn-only
 | 两种车身转角之差 | 14.43° | 1.36° | 0° |
 
 单次转弯的里程计与真值角度差下降约 90.6%。这强烈支持原先轮名顺序是主要的系统性误差来源；仍有约 1.36° 差异，不能据此断言车轮完全不打滑。下一步先复测**完整一圈**的起终点误差，再设计 10 次重复试验及均值 ± 标准差。
+
+## 修正后第一圈与位姿参考点
+
+`square_trial_02` 复测同一条 2 m 外框圆角方形命令，保存 4793 条里程计、1918 条 Gazebo 真值、4795 条关节数据。三份 CSV 时间严格递增。车体转角分别为 `/odom` **357.02°** 和 Gazebo 真值 **358.53°**，与完整一圈的 360° 很接近。
+
+直接叠加 `/odom` 和 `/gazebo/model_states` 时，途中仍可能看到约十几厘米的间隔。这部分不能立即算作里程计漂移：控制器积分的是**后驱动轴中点**的轨迹，而模型位姿在现有车模中表现为**车体中心**，两者沿车体前后方向相距约半个轴距 `0.28/2=0.14 m`。转弯时车体中心与后轴中点画出的圆弧不同。`scripts/analyze_trial.py` 保留原始 CSV，并在分析时按 `后轴真值 = 模型位姿 − 0.14·(cos θ, sin θ)` 转换到相同的物理点；然后分别对齐起点和初始朝向，在相同时刻插值比较。这个 0.14 m 转换与轨迹形状吻合，但后续 TF 检查还应核对模型坐标与车体坐标的关系。[ROS 2 控制器运动学说明](https://control.ros.org/iron/doc/ros2_controllers/doc/mobile_robot_kinematics.html)给出了后轴速度与车身角速度的关系。
+
+```bash
+python3 scripts/analyze_trial.py --input logs/square_trial_02 --output-prefix results/square_trial_02
+```
+
+脚本输出 [`results/square_trial_02_trajectory.png`](results/square_trial_02_trajectory.png) 和 [`results/square_trial_02_analysis.json`](results/square_trial_02_analysis.json)。使用同一后轴参考点，修正前后试跑如下：
+
+| 指标 | 轮名修正前 `square_trial_01` | 修正后 `square_trial_02` |
+| :-- | --: | --: |
+| Gazebo 真值终点距起点 | 0.358 m | **0.0238 m** |
+| `/odom` 终点距起点 | 0.620 m | **0.0780 m** |
+| 两路终点位置之差 | 0.954 m | **0.0545 m** |
+| 行驶与静止期间逐时刻位置差的平均值 | 0.423 m | **0.0275 m** |
+
+最后一行是**这一圈中多个时间采样点的平均差**，不是题目要求的“10 次运行的均值 ± 标准差”。正式统计必须以每次完整运行分别算一个误差，再对 10 个误差值求均值和标准差。
+
+## 重复实验：先试运行，再采集 10 圈
+
+`scripts/run_trials.py` 把“开始记录 → 静止 1 秒 → 驾驶一圈 → 停车后继续记录 2 秒”合成一次运行，并为每圈创建独立的 `run_01/`、`run_02/` 等目录。每个目录包含原始 `odom.csv`、`truth.csv` 和表示完整性的 `metadata.json`。驾驶仍然只按预设速度与仿真时间执行，Gazebo 真值只用于分析，不反馈给驾驶器。每圈约 69 秒仿真时间；10 圈约需 12 分钟，加上 Gazebo 加载时间。
+
+这里的 10 次是**同一 Gazebo 会话中连续的 10 圈**，每圈起点和初始朝向分别对齐；小车在两圈之间停约 2 秒，仿真世界不会重置。因此计算出的标准差描述此连续试验的圈间变化，不能解释为完全独立的 10 次开机试验。
+
+先保持 Gazebo 和控制器运行，用一个新终端试采 **1 圈**，验证单命令流程：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/run_trials.py --runs 1 --out logs/repeat_pilot
+```
+
+成功应看到 `Run 1/1: complete`，并有 `logs/repeat_pilot/run_01/metadata.json`。正式运行时使用**新的**输出目录，避免覆盖试采：
+
+```bash
+python3 scripts/run_trials.py --runs 10 --out logs/square_repeats_01
+```
+
+全部显示 `complete` 后，计算每圈误差和 10 圈的**样本标准差**（分母 `n−1`）：
+
+```bash
+python3 scripts/analyze_repeats.py --runs-dir logs/square_repeats_01 --out results/square_repeats_01
+```
+
+`per_run.csv` 每圈一行；`summary.json` 对各指标给出均值与标准差；`trajectories.png` 以相同坐标比例叠加 10 圈。最核心的漂移指标是**起点对齐后的里程计终点与后轴 Gazebo 真值终点之差**；Gazebo 真值自身的闭环偏差单列，表示小车对计划路线的执行误差。分析时仍将原始模型位姿后移 `0.14 m` 到后轴中点，原始 CSV 不改写。分析脚本会拒绝缺失或不完整的运行目录，不会把半圈误当正式样本。

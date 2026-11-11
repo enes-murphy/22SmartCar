@@ -46,6 +46,7 @@ class SquareDriver(Node):
         self.previous_time = None
         self.stop_ticks = 0
         self.finished = False
+        self.aborted = False
         # A steady timer can wake before /clock starts; stage durations still use Gazebo time.
         self.timer = self.create_timer(
             0.05, self.tick, clock=Clock(clock_type=ClockType.STEADY_TIME)
@@ -63,6 +64,7 @@ class SquareDriver(Node):
             return
         if self.previous_time is not None and now < self.previous_time:
             self.get_logger().error("Simulation clock reset during the run; stopping")
+            self.aborted = True
             self.stop_ticks = 10
             self.stage_index = len(self.stages)
         self.previous_time = now

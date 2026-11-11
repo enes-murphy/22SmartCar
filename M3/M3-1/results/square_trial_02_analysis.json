@@ -1,0 +1,12 @@
+{
+  "truth_reference": "Gazebo model pose shifted back 0.140 m to rear axle",
+  "odom_closure_m": 0.07797235085592841,
+  "truth_closure_m": 0.023806661608791784,
+  "endpoint_disagreement_m": 0.05449726535770731,
+  "odom_heading_change_deg": 357.0247447614439,
+  "truth_heading_change_deg": 358.53420207271677,
+  "mean_path_disagreement_m": 0.02747254403064676,
+  "max_path_disagreement_m": 0.05449503754958467,
+  "odom_rows": 4793,
+  "truth_rows": 1918
+}
