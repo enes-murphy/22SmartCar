@@ -192,3 +192,27 @@ python3 scripts/drive_square.py --side 2.0 --radius 0.65 --speed 0.1 --laps 1
 | 累积转角 | 327.2° | 380.8° |
 
 两路起点对齐后的终点相距约 **0.925 m**。这里的 0.345 m 是车实际没有回到起点的闭环偏差；0.925 m 才是本次里程计与真值在终点的估计差异。按试跑开始时间粗略分段，四次转弯每次都约为里程计 82°、真值 95°，而指令期望 90°。重复出现的方向性偏差提示优先检查转向几何、控制器里程计计算和轮地接触；单凭这一圈还不能断言是打滑或某个参数错误。正式实验前要先诊断转弯偏差，再明确 10 次试验的统一起止条件。
+
+## 转弯诊断：同时看前轮和车身
+
+圆弧命令取 `v=0.1 m/s`、`R=0.65 m`，所以目标角速度 `ω=v/R≈0.154 rad/s`，持续 `πR/(2v)≈10.2 s` 后期望转过 90°。依据轴距 `0.28 m`、前轮距 `0.18 m`，理想左转的内侧前轮角约 `atan(0.28/(0.65−0.09))≈26.6°`，外侧前轮约 `atan(0.28/(0.65+0.09))≈20.7°`。这只是几何预测，`/joint_states` 才能告诉我们仿真里前轮实际转到了多少。
+
+如果 Gazebo 已经关闭，先按上文“终端 A”命令启动。保持 Gazebo 运行，在终端 B 开始记录：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/record_traj.py --duration 90 --joints --out logs/turn_diag_01
+```
+
+终端 C 执行一次左转：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/drive_square.py --radius 0.65 --speed 0.1 --turn-only
+```
+
+终端 C 显示 `Run complete` 后，回终端 B 按 `Ctrl+C` 保存。期待 `logs/turn_diag_01/` 出现 `odom.csv`、`truth.csv`、`joints.csv`。其中 `joints.csv` 的前两列关节位置是弧度，代表左右前轮转向角；后两列是后轮旋转角，不是车身航向。比较三者可区分转向命令未执行、车身运动偏离车轮几何，以及里程计计算偏差。

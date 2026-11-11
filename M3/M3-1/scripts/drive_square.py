@@ -68,7 +68,7 @@ class SquareDriver(Node):
         self.previous_time = now
         if self.stage_start is None:
             self.stage_start = now
-            self.get_logger().info("Controller and simulation clock ready; starting square")
+            self.get_logger().info("Controller and simulation clock ready; starting drive")
 
         while self.stage_index < len(self.stages):
             lap, edge, kind, duration, linear, angular = self.stages[self.stage_index]
@@ -92,17 +92,26 @@ def main():
     parser.add_argument("--radius", type=float, default=0.65, help="Corner centreline radius in metres")
     parser.add_argument("--speed", type=float, default=0.1, help="Forward speed in m/s")
     parser.add_argument("--laps", type=int, default=1, help="Number of complete circuits")
+    parser.add_argument("--turn-only", action="store_true", help="Drive one 90-degree left turn for diagnosis")
     args = parser.parse_args()
     if args.side <= 0 or args.speed <= 0 or args.laps < 1:
         parser.error("side and speed must be positive; laps must be at least 1")
+    if args.turn_only and args.laps != 1:
+        parser.error("--turn-only requires --laps 1")
     try:
         stages = make_stages(args.side, args.radius, args.speed, args.laps)
     except ValueError as error:
         parser.error(str(error))
+    if args.turn_only:
+        stages = [stages[1]]
     straight = args.side - 2 * args.radius
     seconds = sum(stage[3] for stage in stages)
-    print(f"Straight {straight:.3f} m, turn radius {args.radius:.3f} m, "
-          f"expected {seconds:.1f} simulation seconds for {args.laps} lap(s)")
+    if args.turn_only:
+        print(f"One left turn, radius {args.radius:.3f} m, "
+              f"expected {seconds:.1f} simulation seconds")
+    else:
+        print(f"Straight {straight:.3f} m, turn radius {args.radius:.3f} m, "
+              f"expected {seconds:.1f} simulation seconds for {args.laps} lap(s)")
 
     rclpy.init()
     driver = SquareDriver(stages)
