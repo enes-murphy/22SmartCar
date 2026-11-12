@@ -24,8 +24,10 @@ def metrics_for_run(folder, truth_offset):
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     if not metadata.get("complete"):
         raise ValueError(f"{folder}: trial is not marked complete")
+    offset = (truth_offset if truth_offset is not None
+              else metadata.get("truth_forward_offset_m", 0.14))
     odom = local_poses(read_poses(folder / "odom.csv"))
-    truth = local_poses(read_poses(folder / "truth.csv"), truth_offset)
+    truth = local_poses(read_poses(folder / "truth.csv"), offset)
     errors = path_discrepancies(odom, truth)
     if not errors:
         raise ValueError(f"{folder}: odom and truth timestamps do not overlap")
@@ -37,7 +39,7 @@ def metrics_for_run(folder, truth_offset):
         "mean_path_disagreement_m": mean(errors),
         "truth_heading_error_deg": math.degrees(truth[-1][3]) - 360.0,
         "odom_heading_error_deg": math.degrees(odom[-1][3]) - 360.0,
-    }, odom, truth, metadata
+    }, odom, truth, metadata, offset
 
 
 def main():
@@ -45,20 +47,22 @@ def main():
     parser.add_argument("--runs-dir", type=Path, required=True, help="Directory with run_01, ...")
     parser.add_argument("--out", type=Path, required=True, help="Output directory for summaries")
     parser.add_argument("--expected-runs", type=int, default=10, help="Required complete trial count")
-    parser.add_argument("--truth-forward-offset", type=float, default=0.14,
-                        help="Gazebo model centre ahead of rear axle in metres")
+    parser.add_argument("--truth-forward-offset", type=float,
+                        help="Override model-pose offset from each run's metadata (metres)")
     args = parser.parse_args()
     if args.expected_runs < 2:
         parser.error("at least two runs are needed for a sample standard deviation")
+    if args.truth_forward_offset is not None and args.truth_forward_offset < 0:
+        parser.error("--truth-forward-offset must be nonnegative")
     folders = sorted(p for p in args.runs_dir.glob("run_*") if p.is_dir())
     if len(folders) != args.expected_runs:
         raise ValueError(f"Expected {args.expected_runs} run directories, found {len(folders)}")
     results = [metrics_for_run(folder, args.truth_forward_offset) for folder in folders]
-    settings = {(meta["side_m"], meta["radius_m"], meta["speed_mps"])
-                for _, _, _, meta in results}
+    settings = {(meta["side_m"], meta["radius_m"], meta["speed_mps"], offset)
+                for _, _, _, meta, offset in results}
     if len(settings) != 1:
-        raise ValueError("Trials used different side, radius, or speed settings")
-    side, radius, speed = settings.pop()
+        raise ValueError("Trials used different side, radius, speed, or model-pose offset")
+    side, radius, speed, offset = settings.pop()
     rows = [item[0] for item in results]
     summary = {
         "runs": len(rows),
@@ -66,7 +70,7 @@ def main():
         "side_m": side,
         "radius_m": radius,
         "speed_mps": speed,
-        "truth_forward_offset_m": args.truth_forward_offset,
+        "truth_forward_offset_m": offset,
         "standard_deviation": "sample (n-1 denominator)",
         "metrics": {field: {"mean": mean(row[field] for row in rows),
                             "std": stdev(row[field] for row in rows)}
@@ -87,7 +91,7 @@ def main():
     figure, axis = plt.subplots(figsize=(8, 8))
     ideal = ideal_square(side, radius)
     axis.plot(*zip(*ideal), color="#555555", linestyle="--", label="commanded geometry")
-    for index, (_, odom, truth, _) in enumerate(results):
+    for index, (_, odom, truth, _, _) in enumerate(results):
         axis.plot([r[1] for r in odom], [r[2] for r in odom], color="#d95f02",
                   alpha=0.35, label="odom" if index == 0 else None)
         axis.plot([r[1] for r in truth], [r[2] for r in truth], color="#1b9e77",

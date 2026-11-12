@@ -88,19 +88,23 @@ def main():
     parser.add_argument("--output-prefix", type=Path, required=True, help="Path prefix for JSON and PNG")
     parser.add_argument("--side", type=float, default=2.0, help="Outer width in metres")
     parser.add_argument("--radius", type=float, default=0.65, help="Commanded turn radius in metres")
-    parser.add_argument("--truth-forward-offset", type=float, default=0.14,
-                        help="Gazebo model centre ahead of rear axle in metres")
+    parser.add_argument("--truth-forward-offset", type=float,
+                        help="Override model-pose offset from metadata (metres)")
     args = parser.parse_args()
-    if args.truth_forward_offset < 0:
+    metadata_path = args.input / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.is_file() else {}
+    truth_forward_offset = (args.truth_forward_offset if args.truth_forward_offset is not None
+                            else metadata.get("truth_forward_offset_m", 0.14))
+    if truth_forward_offset < 0:
         parser.error("--truth-forward-offset must be nonnegative")
     ideal = ideal_square(args.side, args.radius)
     odom = local_poses(read_poses(args.input / "odom.csv"))
-    truth = local_poses(read_poses(args.input / "truth.csv"), args.truth_forward_offset)
+    truth = local_poses(read_poses(args.input / "truth.csv"), truth_forward_offset)
     errors = path_discrepancies(odom, truth)
     if not errors:
         raise ValueError("The two CSV files have no overlapping timestamps")
     metrics = {
-        "truth_reference": f"Gazebo model pose shifted back {args.truth_forward_offset:.3f} m to rear axle",
+        "truth_reference": f"Gazebo model pose shifted back {truth_forward_offset:.3f} m to rear axle",
         "odom_closure_m": math.hypot(odom[-1][1], odom[-1][2]),
         "truth_closure_m": math.hypot(truth[-1][1], truth[-1][2]),
         "endpoint_disagreement_m": math.dist(odom[-1][1:3], truth[-1][1:3]),

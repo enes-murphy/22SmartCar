@@ -43,7 +43,7 @@ M3-1/
 | 轮半径 | `0.05 m` | `0.05 m` | 轮速换算和里程计 |
 | 转向限位 | 前轮关节约 `±0.5236 rad` | `±0.5236 rad` | 最大约 30° |
 
-`base_footprint` 在地面，`base_link` 比它高一个轮半径（0.05 m）；这段变换由车模中的 fixed joint 定义。
+`base_footprint` 在地面；修正后的车模将车体参考点 `base_link` 放在它前方半个轴距（0.14 m）、上方一个轮半径（0.05 m）。这段变换由车模中的 fixed joint 定义。下文已采集的 10 圈和第一次 TF 图保留了**修正前** x=0 的配置，便于比较。
 
 先用简化单轨模型估算。轴距 `L = 0.28 m`、最大等效转向角 `δ ≈ 30°`：
 
@@ -345,22 +345,24 @@ python3 scripts/analyze_repeats.py --runs-dir logs/square_repeats_01 --out resul
 
 ## TF 坐标系现场检查
 
-在 Gazebo 运行时执行 `ros2 run tf2_tools view_frames --ros-args -p use_sim_time:=true`，得到 [`results/tf_tree.pdf`](results/tf_tree.pdf)、[`results/tf_tree.gv`](results/tf_tree.gv) 和便于预览的 [`results/tf_tree.png`](results/tf_tree.png)。实测主链为：
+在 Gazebo 运行时执行 `ros2 run tf2_tools view_frames --ros-args -p use_sim_time:=true`，得到 [`results/tf_tree.pdf`](results/tf_tree.pdf)、[`results/tf_tree.gv`](results/tf_tree.gv) 和便于预览的 [`results/tf_tree.png`](results/tf_tree.png)。这张图来自**参考点修正前**的运行，实测主链为：
 
 ```text
 odom ──动态，约 50 Hz──> base_footprint ──固定──> base_link ──固定──> lidar_link
 ```
 
-`base_link` 还连接了相机和四轮。`view_frames` 给固定变换显示的 `10000 Hz`、时间 `0.0` 是其静态变换显示方式，不能理解成传感器每秒发布一万次；图中的 `default_authority` 也不足以单凭这张图识别发布节点。结合本项目配置，`odom → base_footprint` 来自阿克曼控制器（YAML 中 `enable_odom_tf: true`，frame ID 设为 `odom` 和 `base_footprint`）；车体、雷达等关节的固定变换来自 `robot_state_publisher` 展开的 Xacro；车轮关节随 `/joint_states` 更新。`base_footprint → base_link` 是 `z=0.05 m`，`base_link → lidar_link` 是 `z=0.085 m`，均无转角。
+`base_link` 还连接了相机和四轮。`view_frames` 给固定变换显示的 `10000 Hz`、时间 `0.0` 是其静态变换显示方式，不能理解成传感器每秒发布一万次；图中的 `default_authority` 也不足以单凭这张图识别发布节点。结合本项目配置，`odom → base_footprint` 来自阿克曼控制器（YAML 中 `enable_odom_tf: true`，frame ID 设为 `odom` 和 `base_footprint`）；车体、雷达等关节的固定变换来自 `robot_state_publisher` 展开的 Xacro；车轮关节随 `/joint_states` 更新。旧版实测 `base_footprint → base_link` 是 `[0, 0, 0.05] m`，`base_link → lidar_link` 是 `[0, 0, 0.085] m`，均无转角。
 
 | frame | 本项目中的含义 |
 | :-- | :-- |
 | `map` | 地图参考系，通常由建图或定位系统提供长期全局参照；本次没有启动这类节点，因此树中**没有** `map`，不属于 Gazebo 启动失败。 |
 | `odom` | 局部连续参照；轮速积分让它相对车身平滑，但长期会漂移。 |
-| `base_footprint` | 车体基座在地面的二维参考点；本 Xacro 将它放在 `base_link` 正下方。 |
+| `base_footprint` | 车体基座在地面的二维参考点；修正后位于后轴中点。旧版将它放在 `base_link` 正下方。 |
 | `base_link` | 车体本体的参考坐标系；跟随小车平移、转动。 |
 | `lidar_link` | 雷达安装位置；相对车体固定，`/scan` 应使用它作为 `header.frame_id`。 |
 
 [ROS REP-105](https://github.com/ros-infrastructure/rep/blob/master/rep-0105.rst)规定了 `map`、`odom`、`base_link` 的用途和层级；本项目在 `odom` 与 `base_link` 之间增加地面投影 `base_footprint`。将来接入定位时通常由定位系统提供 `map → odom`，而轮里程计继续提供 `odom → base_footprint`。
 
-**参考点审计：** Xacro 的 `base_footprint → base_link` 在 x 方向为 0，前后轴相对 `base_link` 分别在 `+0.14 m` 和 `−0.14 m`；按模型定义，`base_footprint` 因而位于车体中心的正下方。但本项目以两个后轮和前轮转角计算的阿克曼里程计运动学，结合已录轨迹，表明 `/odom` 的积分轨迹更接近**后轴中点**。这解释了为什么统计前必须把 Gazebo 模型真值后移 0.14 m：比较的是同一个物理点。现有 TF 的 `odom → base_footprint` 名称与车模中的 footprint 位置可能相差这 0.14 m，仍需通过 Gazebo link 位姿或单独的转弯参考点实验确认并修正。此问题属于坐标定义一致性，不能简单算作轮子打滑。[ROS 2 Humble 的车式运动学说明](https://control.ros.org/humble/doc/ros2_controllers/doc/mobile_robot_kinematics.html)给出了后轴速度与车身角速度的计算关系。
+**参考点审计：** 旧版 Xacro 的 `base_footprint → base_link` 在 x 方向为 0，前后轴相对 `base_link` 分别在 `+0.14 m` 和 `−0.14 m`；按模型定义，旧版 `base_footprint` 因而位于车体中心正下方。但本项目以两个后轮和前轮转角计算的阿克曼里程计运动学，结合已录轨迹，表明 `/odom` 的积分轨迹更接近**后轴中点**。在单圈试采中，不换算参考点的全程平均轨迹距离约 0.181 m，后移 Gazebo 模型真值 0.14 m 后降为约 0.018 m。原始 10 圈分析仍按旧版模型将 Gazebo 真值后移 0.14 m，结果有效且保留原始 CSV。此问题属于坐标定义一致性，不能简单算作轮子打滑。[ROS 2 Humble 的车式运动学说明](https://control.ros.org/humble/doc/ros2_controllers/doc/mobile_robot_kinematics.html)给出了后轴速度与车身角速度的计算关系。
+
+已将源码中的 `base_footprint_joint` 改为 `base_link` 相对后轴地面点前移 0.14 m、上移 0.05 m，使 TF 名称与控制器的积分参考点一致。**这项改动尚待重新构建、重启 Gazebo 后实测**；不能用旧版 TF 图或旧版 10 圈数据冒充新版验证。新采集目录的 `metadata.json` 会写入 `truth_forward_offset_m: 0.0`，分析器按每次采集的元数据选择换算距离；旧目录没有此字段时仍按旧版 0.14 m 分析。新版应先跑 1 圈确认 TF 平移和两路轨迹，再决定是否重复正式 10 圈。

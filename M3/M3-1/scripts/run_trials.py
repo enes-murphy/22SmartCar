@@ -27,7 +27,7 @@ def spin_until(executor, condition, timeout_wall=300.0):
         executor.spin_once(timeout_sec=0.2)
 
 
-def run_one(executor, folder, side, radius, speed, model):
+def run_one(executor, folder, side, radius, speed, model, truth_forward_offset):
     recorder = TrajectoryRecorder(folder, model)
     driver = None
     executor.add_node(recorder)
@@ -59,6 +59,7 @@ def run_one(executor, folder, side, radius, speed, model):
             "side_m": side,
             "radius_m": radius,
             "speed_mps": speed,
+            "truth_forward_offset_m": truth_forward_offset,
             "recorder_start_sim_s": recorder.start_time,
             "drive_start_sim_s": drive_start,
             "drive_end_sim_s": drive_end,
@@ -91,9 +92,11 @@ def main():
     parser.add_argument("--radius", type=float, default=0.65, help="Turn radius in metres")
     parser.add_argument("--speed", type=float, default=0.1, help="Forward speed in m/s")
     parser.add_argument("--model", default="smart_car", help="Gazebo model name")
+    parser.add_argument("--truth-forward-offset", type=float, default=0.0,
+                        help="How far model pose lies ahead of rear axle; 0 for the aligned Xacro")
     args = parser.parse_args()
-    if args.runs < 1 or args.speed <= 0:
-        parser.error("--runs must be at least 1 and --speed must be positive")
+    if args.runs < 1 or args.speed <= 0 or args.truth_forward_offset < 0:
+        parser.error("--runs must be at least 1, --speed positive, and offset nonnegative")
     try:
         make_stages(args.side, args.radius, args.speed, 1)
     except ValueError as error:
@@ -110,7 +113,8 @@ def main():
     try:
         for index, folder in enumerate(folders, 1):
             print(f"Run {index}/{args.runs}: recording {folder}", flush=True)
-            result = run_one(executor, folder, args.side, args.radius, args.speed, args.model)
+            result = run_one(executor, folder, args.side, args.radius, args.speed,
+                             args.model, args.truth_forward_offset)
             print(f"Run {index}/{args.runs}: complete, {result['odom_rows']} odom and "
                   f"{result['truth_rows']} truth rows", flush=True)
     except (KeyboardInterrupt, ExternalShutdownException, InterruptedError) as error:
