@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "side_m": 2.0,
+  "radius_m": 0.65,
+  "speed_mps": 0.1,
+  "recorder_start_sim_s": 216.15,
+  "drive_start_sim_s": 217.3,
+  "drive_end_sim_s": 286.63,
+  "odom_rows": 3624,
+  "truth_rows": 1450,
+  "wall_elapsed_s": 72.60202371899982,
+  "trial_type": "consecutive_lap_without_world_reset"
+}

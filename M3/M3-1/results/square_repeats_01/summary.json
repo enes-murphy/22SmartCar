@@ -1,0 +1,35 @@
+{
+  "runs": 10,
+  "trial_type": "consecutive_laps_without_world_reset",
+  "side_m": 2.0,
+  "radius_m": 0.65,
+  "speed_mps": 0.1,
+  "truth_forward_offset_m": 0.14,
+  "standard_deviation": "sample (n-1 denominator)",
+  "metrics": {
+    "truth_closure_m": {
+      "mean": 0.013565065751930939,
+      "std": 0.004746542565420633
+    },
+    "odom_closure_m": {
+      "mean": 0.041153655835229966,
+      "std": 0.00782164130938725
+    },
+    "endpoint_disagreement_m": {
+      "mean": 0.033767138447799466,
+      "std": 0.004420433960282058
+    },
+    "mean_path_disagreement_m": {
+      "mean": 0.015370889136585521,
+      "std": 0.002819802763791413
+    },
+    "truth_heading_error_deg": {
+      "mean": -0.5984143099684729,
+      "std": 0.27252444533508885
+    },
+    "odom_heading_error_deg": {
+      "mean": -2.346210604859607,
+      "std": 0.26468429651334147
+    }
+  }
+}

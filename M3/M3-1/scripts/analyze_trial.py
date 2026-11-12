@@ -14,9 +14,20 @@ def read_poses(path):
     with path.open(newline="", encoding="utf-8") as file:
         rows = [{key: float(value) for key, value in row.items()}
                 for row in csv.DictReader(file)]
-    if len(rows) < 2 or any(rows[i]["t"] <= rows[i - 1]["t"] for i in range(1, len(rows))):
-        raise ValueError(f"{path}: need at least two rows with strictly increasing time")
-    return rows
+    # Model states have no header stamp; the recorder gives them the latest
+    # /clock time. Several messages can therefore share one clock tick. Keep
+    # the last pose at that tick so interpolation still has unique times.
+    unique = []
+    for row in rows:
+        if unique and row["t"] < unique[-1]["t"]:
+            raise ValueError(f"{path}: timestamps moved backwards")
+        if unique and row["t"] == unique[-1]["t"]:
+            unique[-1] = row
+        else:
+            unique.append(row)
+    if len(unique) < 2:
+        raise ValueError(f"{path}: need at least two distinct timestamps")
+    return unique
 
 
 def local_poses(rows, forward_offset=0.0):
