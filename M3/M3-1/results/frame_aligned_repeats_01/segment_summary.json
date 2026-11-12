@@ -1,0 +1,23 @@
+{
+  "runs": 10,
+  "standard_deviation": "sample (n-1 denominator)",
+  "timing_note": "Stage boundaries use the scheduled simulation times; command delivery may lag by one 20 Hz tick.",
+  "metrics": {
+    "mean_straight_distance_bias_m": {
+      "mean": 3.593517719389649e-05,
+      "std": 0.0006254516904605281
+    },
+    "straight_heading_bias_deg": {
+      "mean": -0.05021590627926357,
+      "std": 0.06858652694905994
+    },
+    "turn_heading_bias_deg": {
+      "mean": -1.699217332091311,
+      "std": 0.17549957770980018
+    },
+    "mean_turn_heading_bias_deg": {
+      "mean": -0.4248043330228278,
+      "std": 0.043874894427450045
+    }
+  }
+}
