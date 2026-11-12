@@ -12,6 +12,11 @@ log/
 **/install/**
 **/log/**
 
+# rosbag recordings can be hundreds of MB; keep the placeholder, metadata and
+# selected reports in Git, but store raw bags locally or publish them separately.
+M3/M3-2/bags/*
+!M3/M3-2/bags/.gitkeep
+
 # editor
 .vscode/
 *.swp
