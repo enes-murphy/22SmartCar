@@ -108,7 +108,14 @@ ros2 launch smart_car_slam sim_slam.launch.py
 ```
 
 第一次启动默认不打开 RViz，先单独验证 Gazebo 和 ROS 数据链。后续可用
-`rviz:=true` 启动可视化。实测前不把“构建成功”当成“建图成功”。
+`rviz:=true` 启动可视化；工程自己的 `config/mapping.rviz` 已设置俯视视角与
+`/map` 显示。已有仿真运行时，可在另一终端单独执行：
+
+```bash
+rviz2 -d config/mapping.rviz --ros-args -p use_sim_time:=true
+```
+
+实测前不把“构建成功”当成“建图成功”。
 
 ## 最终交付物
 

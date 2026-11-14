@@ -16,13 +16,12 @@ def generate_launch_description():
     slam_share = Path(get_package_share_directory("smart_car_slam"))
     car_share = Path(get_package_share_directory("smart_car_description"))
     gazebo_share = Path(get_package_share_directory("gazebo_ros"))
-    toolbox_share = Path(get_package_share_directory("slam_toolbox"))
 
     world = slam_share / "worlds" / "scene.world"
     slam_params = slam_share / "config" / "slam_params.yaml"
     xacro = car_share / "urdf" / "smart_car.urdf.xacro"
     gazebo_clock = car_share / "config" / "gazebo_clock.yaml"
-    rviz_config = toolbox_share / "config" / "slam_toolbox_default.rviz"
+    rviz_config = slam_share / "config" / "mapping.rviz"
     use_rviz = LaunchConfiguration("rviz")
 
     gazebo = IncludeLaunchDescription(
