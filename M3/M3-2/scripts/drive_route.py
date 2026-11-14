@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "M3-1" / "scripts")
 from drive_square import SquareDriver, STEERING_LIMIT, TRACK_WIDTH, WHEELBASE  # noqa: E402
 
 import rclpy  # noqa: E402
+from rclpy.signals import SignalHandlerOptions  # noqa: E402
 
 
 def make_route(laps, straight_speed, turn_speed, radius):
@@ -55,7 +56,9 @@ def main():
     if args.dry_run:
         return
 
-    rclpy.init()
+    # Keep the ROS context alive on Ctrl+C so the finally block can publish
+    # an explicit zero command before shutting down.
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     driver = SquareDriver(stages)
     try:
         while rclpy.ok() and not driver.finished:
