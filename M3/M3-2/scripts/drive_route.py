@@ -40,6 +40,8 @@ def main():
     parser.add_argument("--radius", type=float, default=1.0, help="m")
     parser.add_argument("--straight-test", type=float, metavar="METRES",
                         help="Drive only this many metres of the first straight")
+    parser.add_argument("--first-corner", action="store_true",
+                        help="Stop after the first 10 m straight and 90-degree turn")
     parser.add_argument("--dry-run", action="store_true", help="Print route without driving")
     parser.add_argument("--wall-follow", action="store_true",
                         help="Use laser wall-distance feedback on straight segments")
@@ -50,6 +52,8 @@ def main():
         parser.error("this fixed world route requires a 1.0 m corner radius")
     if args.straight_test is not None and not (0 < args.straight_test <= 3.0):
         parser.error("--straight-test must be in (0, 3.0] metres")
+    if args.first_corner and args.straight_test is not None:
+        parser.error("--first-corner cannot be combined with --straight-test")
     try:
         stages = make_route(args.laps, args.straight_speed, args.turn_speed, args.radius)
     except ValueError as error:
@@ -57,6 +61,8 @@ def main():
     if args.straight_test is not None:
         stages = [(1, 1, "straight test", args.straight_test / args.straight_speed,
                    args.straight_speed, 0.0)]
+    elif args.first_corner:
+        stages = stages[:2]
 
     print("Start: (-5, -4), heading east; loop: east, north, west, south")
     for lap, edge, kind, duration, linear, angular in stages:
