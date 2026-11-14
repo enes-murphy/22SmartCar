@@ -37,16 +37,23 @@ def main():
     parser.add_argument("--straight-speed", type=float, default=0.20, help="m/s")
     parser.add_argument("--turn-speed", type=float, default=0.10, help="m/s")
     parser.add_argument("--radius", type=float, default=1.0, help="m")
+    parser.add_argument("--straight-test", type=float, metavar="METRES",
+                        help="Drive only this many metres of the first straight")
     parser.add_argument("--dry-run", action="store_true", help="Print route without driving")
     args = parser.parse_args()
     if args.laps < 1 or args.straight_speed <= 0 or args.turn_speed <= 0:
         parser.error("laps must be at least 1 and speeds must be positive")
     if abs(args.radius - 1.0) > 1e-9:
         parser.error("this fixed world route requires a 1.0 m corner radius")
+    if args.straight_test is not None and not (0 < args.straight_test <= 3.0):
+        parser.error("--straight-test must be in (0, 3.0] metres")
     try:
         stages = make_route(args.laps, args.straight_speed, args.turn_speed, args.radius)
     except ValueError as error:
         parser.error(str(error))
+    if args.straight_test is not None:
+        stages = [(1, 1, "straight test", args.straight_test / args.straight_speed,
+                   args.straight_speed, 0.0)]
 
     print("Start: (-5, -4), heading east; loop: east, north, west, south")
     for lap, edge, kind, duration, linear, angular in stages:
