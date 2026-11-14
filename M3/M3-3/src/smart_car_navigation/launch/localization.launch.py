@@ -1,4 +1,4 @@
-"""Start the M3-2 world and car, then localize on the saved map with AMCL."""
+"""Start the M3-2 world and AMCL, with optional map-based Nav2 navigation."""
 
 from pathlib import Path
 
@@ -10,6 +10,7 @@ from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from nav2_common.launch import ReplaceString
 
 
 def generate_launch_description():
@@ -24,6 +25,7 @@ def generate_launch_description():
         launch_arguments={
             "world": str(slam_share / "worlds" / "scene.world"),
             "verbose": "true",
+            "gui": LaunchConfiguration("gui"),
             "params_file": str(car_share / "config" / "gazebo_clock.yaml"),
         }.items(),
     )
@@ -68,6 +70,25 @@ def generate_launch_description():
             "autostart": "true",
         }.items(),
     )
+    # Replace the marker with the installed XML path before Nav2 reads YAML.
+    nav_params = ReplaceString(
+        source_file=str(nav_share / "config" / "navigation.yaml"),
+        replacements={
+            "__NAV_BT__": str(nav_share / "behavior_trees" / "navigate_ackermann.xml"),
+            "__NAV_THROUGH_BT__": str(
+                nav_share / "behavior_trees" / "navigate_through_poses_ackermann.xml"
+            ),
+        },
+    )
+    navigation = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(str(bringup_share / "launch" / "navigation_launch.py")),
+        launch_arguments={
+            "params_file": nav_params,
+            "use_sim_time": "true",
+            "autostart": "true",
+        }.items(),
+        condition=IfCondition(LaunchConfiguration("navigation")),
+    )
     rviz = Node(
         package="rviz2",
         executable="rviz2",
@@ -79,10 +100,12 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("rviz", default_value="false"),
+        DeclareLaunchArgument("gui", default_value="true"),
+        DeclareLaunchArgument("navigation", default_value="false"),
         gazebo,
         robot_state_publisher,
         RegisterEventHandler(OnProcessExit(target_action=spawn, on_exit=[joint_states])),
         RegisterEventHandler(OnProcessExit(target_action=joint_states, on_exit=[drive])),
-        RegisterEventHandler(OnProcessExit(target_action=drive, on_exit=[localization, rviz])),
+        RegisterEventHandler(OnProcessExit(target_action=drive, on_exit=[localization, navigation, rviz])),
         spawn,
     ])
