@@ -126,3 +126,18 @@ README.md
 
 正式实验还会记录 `/odom`、`/scan`、`/tf`、`/tf_static` 与 `/map`。禁止使用
 `/gazebo/model_states` 修正 SLAM；Gazebo 真值最多只能作为独立的事后评价依据。
+
+## 巡场路线预览
+
+`scripts/drive_route.py` 复用 M3-1 已验证的 ROS 速度发布和仿真时钟逻辑。
+从 `(-5, -4)` 朝东出发，依次走 `10、6、10、6 m` 四段直线，每段后以
+`1.0 m` 半径左转 90°。直线初始速度 `0.20 m/s`，弯道 `0.10 m/s`，
+一圈理论耗时约 `222.8` 仿真秒。先用下面的命令只查看分段，不驱动车辆：
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 scripts/drive_route.py --dry-run
+```
+
+脚本采用按时间控制的开环路线，实际位置会受轮式里程计和物理接触误差影响。
+正式运行前需检查起点、控制器状态；首圈观察是否擦墙或偏离窄门中心。
