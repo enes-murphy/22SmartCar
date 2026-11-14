@@ -12,6 +12,7 @@ from drive_square import SquareDriver, STEERING_LIMIT, TRACK_WIDTH, WHEELBASE  #
 
 import rclpy  # noqa: E402
 from rclpy.signals import SignalHandlerOptions  # noqa: E402
+from drive_centered_test import CenteredDriver  # noqa: E402
 
 
 def make_route(laps, straight_speed, turn_speed, radius):
@@ -40,6 +41,8 @@ def main():
     parser.add_argument("--straight-test", type=float, metavar="METRES",
                         help="Drive only this many metres of the first straight")
     parser.add_argument("--dry-run", action="store_true", help="Print route without driving")
+    parser.add_argument("--wall-follow", action="store_true",
+                        help="Use laser wall-distance feedback on straight segments")
     args = parser.parse_args()
     if args.laps < 1 or args.straight_speed <= 0 or args.turn_speed <= 0:
         parser.error("laps must be at least 1 and speeds must be positive")
@@ -66,7 +69,7 @@ def main():
     # Keep the ROS context alive on Ctrl+C so the finally block can publish
     # an explicit zero command before shutting down.
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    driver = SquareDriver(stages)
+    driver = CenteredDriver(stages) if args.wall_follow else SquareDriver(stages)
     try:
         while rclpy.ok() and not driver.finished:
             rclpy.spin_once(driver, timeout_sec=0.2)

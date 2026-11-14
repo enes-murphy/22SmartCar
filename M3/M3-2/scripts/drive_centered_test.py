@@ -17,9 +17,8 @@ from inspect_scan import distance_at  # noqa: E402
 
 
 class CenteredDriver(SquareDriver):
-    def __init__(self, speed):
-        # Same 3 m segment as the open-loop baseline.
-        super().__init__([(1, 1, "centered straight test", 3.0 / speed, speed, 0.0)])
+    def __init__(self, stages):
+        super().__init__(stages)
         self.scan = None
         self.scan_time = None
         self.last_report = None
@@ -35,7 +34,7 @@ class CenteredDriver(SquareDriver):
         super().tick()
 
     def publish_command(self, linear=0.0, angular=0.0):
-        if linear > 0:
+        if linear > 0 and abs(angular) < 1e-9:
             now = self.get_clock().now().nanoseconds / 1e9
             if self.scan_time is None or now - self.scan_time > 0.5:
                 super().publish_command()
@@ -43,15 +42,19 @@ class CenteredDriver(SquareDriver):
             left = distance_at(self.scan, math.pi / 2)
             right = distance_at(self.scan, -math.pi / 2)
             front = distance_at(self.scan, 0.0)
-            if left is None or right is None or (front is not None and front < 0.50):
-                self.get_logger().error("Missing side wall or obstacle ahead; stopping")
+            if front is not None and front < 0.50:
+                self.get_logger().error("Obstacle ahead within 0.50 m; stopping")
                 self.aborted = True
                 self.stage_index = len(self.stages)
                 super().publish_command()
                 return
-            # Positive difference means more room on the left: turn left.
-            angular = max(-0.12, min(0.12, 0.30 * (left - right)))
-            if self.last_report is None or now - self.last_report >= 2.0:
+            # At corners a side wall may temporarily end. Keep nominal heading
+            # until both walls are visible again; never invent a range value.
+            if left is not None and right is not None:
+                # Positive difference means more room on the left: turn left.
+                angular = max(-0.12, min(0.12, 0.30 * (left - right)))
+            if (left is not None and right is not None
+                    and (self.last_report is None or now - self.last_report >= 2.0)):
                 self.get_logger().info(
                     f"wall distances: left={left:.2f} m, right={right:.2f} m; "
                     f"correction={angular:+.3f} rad/s"
@@ -69,7 +72,8 @@ def main():
     print(f"Laser-centered 3 m test at {args.speed:.2f} m/s, "
           f"expected {3.0 / args.speed:.1f} simulation seconds")
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    driver = CenteredDriver(args.speed)
+    stages = [(1, 1, "centered straight test", 3.0 / args.speed, args.speed, 0.0)]
+    driver = CenteredDriver(stages)
     try:
         while rclpy.ok() and not driver.finished:
             rclpy.spin_once(driver, timeout_sec=0.2)
