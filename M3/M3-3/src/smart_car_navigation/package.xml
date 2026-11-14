@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>smart_car_navigation</name>
+  <version>0.1.0</version>
+  <description>M3-3 localization and navigation of the M3 smart car.</description>
+  <maintainer email="zxx666276@163.com">enesmurphy</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>smart_car_slam</exec_depend>
+  <exec_depend>smart_car_description</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_amcl</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,36 @@
+map_server:
+  ros__parameters:
+    use_sim_time: true
+    # nav2_bringup/localization_launch.py replaces this with the installed map.
+    yaml_filename: ""
+
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    base_frame_id: base_footprint
+    odom_frame_id: odom
+    global_frame_id: map
+    scan_topic: scan
+    tf_broadcast: true
+    robot_model_type: nav2_amcl::DifferentialMotionModel
+    laser_model_type: likelihood_field
+    max_beams: 60
+    min_particles: 500
+    max_particles: 2000
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    update_min_d: 0.05
+    update_min_a: 0.05
+    transform_tolerance: 1.0
+    # The formal M3-2 bag places the car's starting base_footprint at
+    # approximately map (0, 0, 0). Reinitialize from that pose each run.
+    set_initial_pose: true
+    always_reset_initial_pose: true
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
