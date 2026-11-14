@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Test 3 m of laser-centered straight driving at 0.10 m/s."""
+"""Test 3 m of laser-centered straight driving."""
 
+import argparse
 import math
 import sys
 from pathlib import Path
@@ -16,9 +17,9 @@ from inspect_scan import distance_at  # noqa: E402
 
 
 class CenteredDriver(SquareDriver):
-    def __init__(self):
-        # Same 30 s/3 m test as the open-loop baseline.
-        super().__init__([(1, 1, "centered straight test", 30.0, 0.10, 0.0)])
+    def __init__(self, speed):
+        # Same 3 m segment as the open-loop baseline.
+        super().__init__([(1, 1, "centered straight test", 3.0 / speed, speed, 0.0)])
         self.scan = None
         self.scan_time = None
         self.last_report = None
@@ -60,8 +61,15 @@ class CenteredDriver(SquareDriver):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--speed", type=float, default=0.10, help="0.10 or 0.20 m/s")
+    args = parser.parse_args()
+    if args.speed not in (0.10, 0.20):
+        parser.error("--speed must be 0.10 or 0.20 m/s")
+    print(f"Laser-centered 3 m test at {args.speed:.2f} m/s, "
+          f"expected {3.0 / args.speed:.1f} simulation seconds")
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    driver = CenteredDriver()
+    driver = CenteredDriver(args.speed)
     try:
         while rclpy.ok() and not driver.finished:
             rclpy.spin_once(driver, timeout_sec=0.2)
