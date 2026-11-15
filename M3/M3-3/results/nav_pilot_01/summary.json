@@ -1,0 +1,14 @@
+{
+  "test": "isolated composed Nav2 turning-route pilot",
+  "goal_map": {"x": 11.0, "y": 3.0, "yaw_deg": 90.0},
+  "status": "SUCCEEDED",
+  "action_elapsed_wall_s": 84.3,
+  "goal_error_map_base_link_m": 0.18,
+  "odom_rows": 5020,
+  "truth_rows": 2008,
+  "odom_path_length_m": 12.422,
+  "truth_path_length_m": 12.418,
+  "odom_end": {"x": 11.040636, "y": 2.503709},
+  "truth_end_world": {"x": 5.991004, "y": -1.329735},
+  "notes": "The recorder spans about 100.4 simulated seconds, including idle time before and after the action. Path lengths use the whole recording. map base_link and odom base_footprint are different frames."
+}

@@ -12,7 +12,10 @@ from nav2_msgs.action import NavigateToPose
 from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.signals import SignalHandlerOptions
+from rclpy.time import Time
+from tf2_ros import Buffer, TransformListener
 
 
 def main():
@@ -26,6 +29,9 @@ def main():
     # Keep the context alive on Ctrl+C so the car can receive a final stop.
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = Node("m3_3_short_nav_test")
+    node.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+    tf_buffer = Buffer(node=node)
+    tf_listener = TransformListener(tf_buffer, node)
     stop_publisher = node.create_publisher(Twist, "/cmd_vel", 10)
     last_odom = None
 
@@ -88,15 +94,20 @@ def main():
         # cannot be confused during a controller diagnosis.
         rclpy.spin_once(node, timeout_sec=0.2)
         end = last_odom.pose.pose.position
-        error = math.hypot(end.x - 2.0, end.y)
+        distance_moved = math.hypot(end.x - start.x, end.y - start.y)
         print(f"Odom end: x={end.x:.2f}, y={end.y:.2f}; "
-              f"target error={error:.2f} m", flush=True)
+              f"moved={distance_moved:.2f} m", flush=True)
         if result.status != GoalStatus.STATUS_SUCCEEDED:
             raise RuntimeError(f"Nav2 ended with status {result.status}")
-        # A successful action status is insufficient: in one isolated run the
-        # controller reported success despite the car remaining at its start.
-        if error > 0.30:
-            raise RuntimeError("Nav2 reported success but odometry did not reach the target")
+        # Nav2 checks base_link in map, while /odom describes base_footprint.
+        # The fixed 0.14 m separation makes a direct /odom-to-goal comparison wrong.
+        transform = tf_buffer.lookup_transform("map", "base_link", Time())
+        p = transform.transform.translation
+        error = math.hypot(p.x - 2.0, p.y)
+        print(f"Map base_link: x={p.x:.2f}, y={p.y:.2f}; "
+              f"goal error={error:.2f} m", flush=True)
+        if distance_moved < 1.0 or error > 0.25:
+            raise RuntimeError("Nav2 status succeeded but measured movement/pose did not")
         print("SUCCEEDED: Nav2 reached the short target", flush=True)
         print("Next: inspect AMCL and Gazebo truth before a longer route", flush=True)
     except KeyboardInterrupt:
