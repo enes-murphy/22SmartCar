@@ -8,8 +8,8 @@
 - [x] 配置 AMCL、代价地图、阿克曼适用的规划器和控制器。
 - [x] 用一条 launch 命令启动仿真、定位与 Nav2。
 - [x] 选择一条大于 5 m 且包含转弯的测试路径。
-- [ ] 至少调 3 个参数，保留改前/改后证据。
-- [ ] 重复 3 次，统计成功率、耗时和失败原因。
+- [x] 至少调 3 个参数，保留改前/改后证据。
+- [x] 重复 3 次，统计成功率、耗时和失败原因。
 
 ```text
 M3-3/
@@ -130,5 +130,64 @@ python3 scripts/check_plan.py
 同步记录在 `results/nav_pilot_01/`：5020 行里程计、2008 行 Gazebo 真值；
 全段轨迹长度分别为 12.422 m 和 12.418 m。录制覆盖了约 100.4 秒，
 包括动作前后的静止时间。`navigation_baseline.yaml` 保留本次参数，
-`summary.json` 保留结果。下一步进行三项参数对照调优，再用固定配置
-重复三次。
+`summary.json` 保留结果。三项参数调优和固定配置的三次复测见下一节。
+
+## 第四步：三项参数调优与固定配置复测
+
+本次同时修改三项控制参数；基线和新配置的完整 YAML 分别保存在
+`results/nav_pilot_01/navigation_baseline.yaml` 与
+`results/nav_tuned_pilot_01/navigation_tuned.yaml`。运行时通过
+`ros2 param get /controller_server` 读回了新值。
+
+| 参数 | 基线 | 新值 | 预期作用 |
+| --- | ---: | ---: | --- |
+| `FollowPath.desired_linear_vel` | 0.15 m/s | 0.18 m/s | 提高直线段目标速度 |
+| `FollowPath.lookahead_dist` | 0.45 m | 0.40 m | 更贴近转弯路径 |
+| `general_goal_checker.xy_goal_tolerance` | 0.20 m | 0.15 m | 缩小到点允许误差 |
+
+同一地图目标 `(11, 3, 90°)` 的首跑对照：基线成功、动作耗时
+84.3 s、`map → base_link` 终点误差 0.18 m；新配置成功、耗时
+71.1 s、终点误差 0.13 m。耗时减少 13.2 s（约 15.7%）。两组各一次，
+且三项参数同时变化，**只能说明整套新配置在这次试跑中更快且终点更近，
+不能把变化归因于某一个参数，也不能据此估计基线的波动范围**。
+
+固定新配置后，`scripts/run_repeats.py` 每次启动新的隔离 Gazebo、
+AMCL 和 Nav2，从相同出生点运行同一目标，并分别保存启动日志、
+动作日志、里程计、Gazebo 真值和 `summary.json`。结果保存在
+`results/nav_repeats_tuned/`：
+
+| 运行 | 成功 | 动作耗时 | `map → base_link` 终点误差 | 真值轨迹长度 |
+| --- | --- | ---: | ---: | ---: |
+| 1 | 是 | 71.1 s | 0.13 m | 12.399 m |
+| 2 | 是 | 71.2 s | 0.13 m | 12.417 m |
+| 3 | 是 | 71.3 s | 0.12 m | 12.458 m |
+
+成功率 **3/3 = 100%**；成功运行的动作耗时 **71.2 ± 0.1 s**
+（均值 ± 样本标准差）；本组三次没有导航失败原因。真值轨迹长度
+平均约 **12.425 m**。这里的 100% 是三次观察结果，不能推广为
+所有场景下的可靠性保证。轨迹记录覆盖动作前后的短暂静止时间。
+
+若要重做，先关闭其他 Gazebo/导航进程，在 M3-3 目录加载四层环境并构建：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+colcon build --base-paths src --symlink-install
+source install/setup.bash
+python3 scripts/run_repeats.py --runs 3 --out results/nav_repeats_tuned_02
+```
+
+新输出目录必须不存在。脚本自动完成三次启动、录制、导航和退出；
+终端显示每次结果及总成功率，不需要手动打开三套终端。
+
+### 关闭阶段的限制
+
+三次动作均已先收到 `Goal succeeded`，保存了 CSV 和结果摘要；
+在退出仿真时，当前 ROS Humble 的 `component_container_mt` 仍可能以
+`exit code -11` 结束。独立的生命周期关停检查同样重现了这一现象，
+因此不能把退出日志中的 `ERROR` 计作导航途中失败。
+`run_repeats.py` 先请求导航与定位生命周期管理器关停，再结束 launch；
+所有隔离试验进程均已退出。后续升级或更换 Nav2 版本时应复查关闭行为。
+Nav2 上游也有[组件容器在生命周期管理器退出时崩溃的报告](https://github.com/ros-navigation/navigation2/issues/6690)；
+该报告使用 Jazzy，不能直接断定这里的 Humble 崩溃有相同根因。

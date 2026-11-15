@@ -1,0 +1,14 @@
+{
+  "test": "isolated composed Nav2 turning-route tuned pilot",
+  "goal_map": {"x": 11.0, "y": 3.0, "yaw_deg": 90.0},
+  "status": "SUCCEEDED",
+  "action_elapsed_wall_s": 71.1,
+  "goal_error_map_base_link_m": 0.13,
+  "odom_rows": 4283,
+  "truth_rows": 1713,
+  "odom_path_length_m": 12.468,
+  "truth_path_length_m": 12.460,
+  "odom_end": {"x": 11.054034, "y": 2.526447},
+  "truth_end_world": {"x": 5.996418, "y": -1.280235},
+  "notes": "Recorder spans about 85.6 simulated seconds including idle time. Tuned three controller parameters together; this paired pilot does not isolate each parameter's causal contribution."
+}

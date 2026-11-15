@@ -1,0 +1,32 @@
+{
+  "run": 2,
+  "success": true,
+  "trial_exit_code": 0,
+  "action_elapsed_wall_s": 71.2,
+  "goal_error_map_base_link_m": 0.13,
+  "failure_reason": null,
+  "odom": {
+    "rows": 3719,
+    "path_length_m": 12.412,
+    "start": {
+      "x": -0.003545,
+      "y": 0.0
+    },
+    "end": {
+      "x": 10.966406,
+      "y": 2.794335
+    }
+  },
+  "truth": {
+    "rows": 1488,
+    "path_length_m": 12.417,
+    "start": {
+      "x": -5.000192,
+      "y": -3.997419
+    },
+    "end": {
+      "x": 5.985479,
+      "y": -1.280598
+    }
+  }
+}
