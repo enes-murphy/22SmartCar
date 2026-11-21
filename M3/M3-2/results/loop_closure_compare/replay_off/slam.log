@@ -1,0 +1,6 @@
+[INFO] [1795270481.149492923] [slam_toolbox]: Node using stack size 40000000
+[INFO] [1795270481.159767127] [slam_toolbox]: Using solver plugin solver_plugins::CeresSolver
+[INFO] [1795270481.159847767] [slam_toolbox]: CeresSolver: Using SCHUR_JACOBI preconditioner.
+Info: clipped range threshold to be within minimum and maximum range!
+Registering sensor: [Custom Described Lidar]
+[INFO] [1795270484.394455719] [slam_toolbox]: Message Filter dropping message: frame 'lidar_link' at time 12.800 for reason 'discarding message because the queue is full'

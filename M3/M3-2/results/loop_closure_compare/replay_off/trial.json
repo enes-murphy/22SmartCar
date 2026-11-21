@@ -1,0 +1,7 @@
+{
+  "source_bag": "bags/formal_02",
+  "replay_bag": "bags/slam_replay_inputs",
+  "replay_rate": 3.0,
+  "ros_domain_id": 172,
+  "config_sha256": "d18ec186b187950cd4dc33e1d330c0ab379bbbc23b1c4f37a40b196bfaecf636"
+}

@@ -1,0 +1,4 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1795270348.795431348] [rosbag2_storage]: Opened database 'bags/slam_replay_inputs/slam_replay_inputs_0.db3' for READ_ONLY.
+[INFO] [1795270348.795466979] [rosbag2_player]: Set rate to 3
+[WARN] [1795270348.797735799] [ROSBAG2_TRANSPORT]: Not all original publishers on topic /tf offered the same QoS profiles. Rosbag2 cannot yet choose an adapted profile to offer for this mixed case. Falling back to the rosbag2_transport default publisher offer.
+[INFO] [1795270348.799508854] [rosbag2_storage]: Opened database 'bags/slam_replay_inputs/slam_replay_inputs_0.db3' for READ_ONLY.

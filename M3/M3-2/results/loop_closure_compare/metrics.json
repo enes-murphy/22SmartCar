@@ -1,0 +1,78 @@
+{
+  "loop_on": {
+    "map": "results/loop_closure_compare/replay_on/map.yaml",
+    "width": 282,
+    "height": 203,
+    "resolution_m": 0.05,
+    "origin": [
+      -2.08,
+      -1.05,
+      0
+    ],
+    "occupied_cells": 2252,
+    "free_cells": 30783,
+    "wall_weighted_rms_m": 0.0079,
+    "walls": {
+      "north": {
+        "samples": 181,
+        "rms_m": 0.0079,
+        "p95_m": 0.0143
+      },
+      "south": {
+        "samples": 181,
+        "rms_m": 0.0074,
+        "p95_m": 0.0124
+      },
+      "west": {
+        "samples": 101,
+        "rms_m": 0.008,
+        "p95_m": 0.0153
+      },
+      "east excluding gate": {
+        "samples": 75,
+        "rms_m": 0.0089,
+        "p95_m": 0.0145
+      }
+    },
+    "max_wall_span_m": 0.1,
+    "gate_known_free_width_m": 1.15
+  },
+  "loop_off": {
+    "map": "results/loop_closure_compare/replay_off/map.yaml",
+    "width": 283,
+    "height": 203,
+    "resolution_m": 0.05,
+    "origin": [
+      -2.08,
+      -1.03,
+      0
+    ],
+    "occupied_cells": 2904,
+    "free_cells": 30571,
+    "wall_weighted_rms_m": 0.0089,
+    "walls": {
+      "north": {
+        "samples": 181,
+        "rms_m": 0.0074,
+        "p95_m": 0.0134
+      },
+      "south": {
+        "samples": 181,
+        "rms_m": 0.0119,
+        "p95_m": 0.0185
+      },
+      "west": {
+        "samples": 101,
+        "rms_m": 0.0083,
+        "p95_m": 0.014
+      },
+      "east excluding gate": {
+        "samples": 75,
+        "rms_m": 0.0,
+        "p95_m": 0.0
+      }
+    },
+    "max_wall_span_m": 0.2,
+    "gate_known_free_width_m": 1.1
+  }
+}

@@ -1,0 +1,16 @@
+[INFO] [1795270465.231368115] [map_saver]: 
+	map_saver lifecycle node launched. 
+	Waiting on external lifecycle transitions to activate
+	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[INFO] [1795270465.231444133] [map_saver]: Creating
+[INFO] [1795270465.231482196] [map_saver]: Configuring
+[INFO] [1795270465.232081302] [map_saver]: Saving map from 'map' topic to 'results/loop_closure_compare/replay_on/map' file
+[WARN] [1795270465.232097240] [map_saver]: Free threshold unspecified. Setting it to default value: 0.250000
+[WARN] [1795270465.232103199] [map_saver]: Occupied threshold unspecified. Setting it to default value: 0.650000
+[WARN] [1795270465.243896371] [map_io]: Image format unspecified. Setting it to: pgm
+[INFO] [1795270465.243948190] [map_io]: Received a 282 X 203 map @ 0.05 m/pix
+[INFO] [1795270465.270821933] [map_io]: Writing map occupancy data to results/loop_closure_compare/replay_on/map.pgm
+[INFO] [1795270465.271249857] [map_io]: Writing map metadata to results/loop_closure_compare/replay_on/map.yaml
+[INFO] [1795270465.271332310] [map_io]: Map saved
+[INFO] [1795270465.271338259] [map_saver]: Map saved successfully
+[INFO] [1795270465.271717623] [map_saver]: Destroying
