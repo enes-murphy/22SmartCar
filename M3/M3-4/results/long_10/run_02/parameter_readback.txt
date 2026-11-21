@@ -1,0 +1,5 @@
+/controller_server FollowPath.lookahead_dist: Double value is: 0.8
+/local_costmap/local_costmap plugins: String values are: ['obstacle_layer', 'inflation_layer']
+/local_costmap/local_costmap obstacle_layer.observation_sources: String value is: scan
+/global_costmap/global_costmap plugins: String values are: ['static_layer', 'obstacle_layer', 'inflation_layer']
+/global_costmap/global_costmap obstacle_layer.observation_sources: String value is: scan

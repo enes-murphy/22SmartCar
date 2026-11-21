@@ -1,0 +1,4 @@
+[controller_server-1] [WARN] [1795255181.979532498] [controller_server]: RegulatedPurePursuitController detected collision ahead!
+[controller_server-1] [WARN] [1795255184.979476577] [controller_server]: RegulatedPurePursuitController detected collision ahead!
+[controller_server-1] [ERROR] [1795255184.979603824] [controller_server]: Controller patience exceeded
+[bt_navigator-5] [ERROR] [1795255185.008836949] [bt_navigator]: Goal failed

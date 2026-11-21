@@ -1,0 +1,5 @@
+AMCL warmup: odom x=0.60, TF age=-0.91 s
+Goal accepted at sim 24.550; box in 8.0 s
+Spawn requested at sim 32.560
+Obstacle inserted at sim 32.760
+SUCCEEDED: 42.0 s; map base_link [7.859255630645728, 0.4145448670582627]

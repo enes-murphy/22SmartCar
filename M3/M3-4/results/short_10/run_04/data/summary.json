@@ -1,0 +1,31 @@
+{
+  "outcome": "SUCCEEDED",
+  "result_status": 4,
+  "error": null,
+  "elapsed_wall_s": 43.86094822599989,
+  "elapsed_sim_s": 43.73,
+  "goal_start_sim_s": 20.65,
+  "obstacle_sim_s": 28.8,
+  "end_map_base_link_xy": [
+    7.860235333875807,
+    0.4058559104840986
+  ],
+  "obstacle_world_xy": [
+    -1.0,
+    -3.35
+  ],
+  "obstacle_size_xy": [
+    0.3,
+    0.3
+  ],
+  "goal_map_xy": [
+    8.0,
+    0.4
+  ],
+  "goal_yaw_deg": 0.0,
+  "no_obstacle": false,
+  "injection_delay_sim_s": 8.0,
+  "plan_count": 43,
+  "odom_rows": 2360,
+  "truth_rows": 956
+}

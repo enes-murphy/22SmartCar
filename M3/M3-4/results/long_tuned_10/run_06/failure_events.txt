@@ -1,0 +1,4 @@
+[controller_server-1] [WARN] [1795255986.368387596] [controller_server]: RegulatedPurePursuitController detected collision ahead!
+[controller_server-1] [WARN] [1795255987.018288815] [controller_server]: RegulatedPurePursuitController detected collision ahead!
+[planner_server-3] [WARN] [1795255987.038605281] [planner_server]: Hybrid: failed to create plan, invalid use: Starting point in lethal space! Cannot create feasible plan..
+[bt_navigator-5] [ERROR] [1795255987.069092066] [bt_navigator]: Goal failed

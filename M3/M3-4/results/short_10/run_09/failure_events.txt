@@ -1,0 +1,2 @@
+[planner_server-3] [WARN] [1795253175.499288741] [planner_server]: Hybrid: failed to create plan, invalid use: Starting point in lethal space! Cannot create feasible plan..
+[bt_navigator-5] [ERROR] [1795253175.529072967] [bt_navigator]: Goal failed

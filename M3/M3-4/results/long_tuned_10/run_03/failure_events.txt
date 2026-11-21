@@ -1,0 +1,2 @@
+[controller_server-1] [ERROR] [1795255557.439672136] [controller_server]: Controller patience exceeded
+[bt_navigator-5] [ERROR] [1795255557.468807693] [bt_navigator]: Goal failed

@@ -1,0 +1,6 @@
+Start: (-5, -4), heading east; loop: east, north, west, south
+Lap 1, edge 1: straight test    3.0 s  linear=0.10 m/s  angular=0.00 rad/s
+Expected total: 3.0 simulation seconds
+[INFO] [1795253763.516653499] [square_driver]: Controller and simulation clock ready; starting drive
+[INFO] [1795253766.548805461] [square_driver]: Lap 1, edge 1: finished straight test
+[INFO] [1795253766.998753127] [square_driver]: Run complete; zero velocity command sent

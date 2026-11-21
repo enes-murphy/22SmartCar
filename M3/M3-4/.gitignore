@@ -1,0 +1,11 @@
+# Local diagnostics from scene selection and interrupted batches.
+results/pilot*/
+results/formal_short*/
+results/costmap_diagnostic/
+
+# Keep accepted-run measurements in Git; leave bulky ROS launch logs locally.
+results/*/attempts/
+results/*/interrupted/
+results/*/batch.log
+results/**/ros_logs/
+results/**/launch.log
