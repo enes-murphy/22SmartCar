@@ -2,27 +2,27 @@
 
 ## 现场考核操作清单（两终端，约 10 分钟）
 
-这份清单对应原题的**约 10 分钟现场流程**：现场跑 **1 圈**证明代码能工作，检查**预先完成的 10 圈**统计、图与 TF。这**不是**原题“运行约定”中从零重新采 10 圈并出图的完整复现；完整复现命令见下方。**终端 A/B 是按用途命名，不是打开的先后序号**：A 专门运行 Gazebo，B 专门检查、试跑和展示结果。只用 Ubuntu；每个新终端都要各自 `source` 环境。以下所有命令的工作目录都是本项目 `M3/M3-1`。
+本节同时给出原题的**完整十圈运行约定**和**约 10 分钟现场展示**。前者从零走 10 圈、录两路 CSV、生成当次统计和图；后者现场走一圈，核对预先完成的十圈证据。考官若要求当场从零跑满十圈，执行下方完整命令，不能用一圈演示冒充十圈实验。**终端 A/B 是按用途命名，不是打开的先后序号**：A 专门运行 Gazebo，B 专门检查、试跑和展示结果。只用 Ubuntu；每个新终端都要各自 `source` 环境。以下所有命令的工作目录都是本项目 `M3/M3-1`。
 
 ### 原题运行约定在本仓库中的对应命令
 
-原题示例的 `square_driver.py --laps 10 --side 2.0 --out logs/` 在本项目由 **`run_trials.py --runs 10 --side 2.0 --out <新日志目录>`** 完成：脚本同时驾驶和记录，每圈在输出目录下建 `run_01` 等子目录，并检查是否完整。原题示例的 `analyze.py --logs ... --out ...` 对应 **`analyze_repeats.py --runs-dir ... --out ...`**。参数名不同，功能对应；`--side`、`--runs` 和 `--out` 都能从命令行传，不是写死在代码里。但原题只明确说**参数名**可自定，没有明确说脚本**文件名**可自定；若考官逐字执行示例命令，这两个文件名不一致仍是兼容性风险。`drive_square.py --laps 10` 虽能让车连续走 10 圈，但它**不负责同时录制和分圈统计**，因此不能单独替代这一步。
+现在提供与原题示例同名的入口：`scripts/square_driver.py` 和 `scripts/analyze.py`。前者调用已验证的 `run_trials.py`，同时驾驶和记录，每圈建 `run_01/odom.csv`、`run_01/truth.csv` 等目录，并另外生成原题示例命名的 `run_01_odom.csv`、`run_01_truth.csv`；后者调用 `analyze_repeats.py`，生成 `closed_loop_stats.md`、`trajectory_compare.png` 及逐圈 CSV/JSON。`--side`、`--laps`、`--out`、`--logs` 都是命令行参数。`drive_square.py --laps 10` 虽能让车连续走 10 圈，但它**不负责同时录制和分圈统计**，因此不能单独替代这一步。
 
 如果考官要求**从零当场跑满 10 圈**，先在终端 A 按下文步骤 1 启动仿真，另在终端 B 进入项目目录并 `source` 两层环境，再在 **B** 连续执行：
 
 ```bash
 EXAM_LOGS="logs/exam_$(date +%Y%m%d_%H%M%S)"
 EXAM_RESULTS="results/$(basename "$EXAM_LOGS")"
-python3 scripts/run_trials.py --runs 10 --side 2.0 --radius 0.65 --speed 0.1 --out "$EXAM_LOGS"
-python3 scripts/analyze_repeats.py --runs-dir "$EXAM_LOGS" --expected-runs 10 --out "$EXAM_RESULTS"
+python3 scripts/square_driver.py --laps 10 --side 2.0 --radius 0.65 --speed 0.1 --out "$EXAM_LOGS"
+python3 scripts/analyze.py --logs "$EXAM_LOGS" --expected-runs 10 --out "$EXAM_RESULTS"
 ```
 
 待 `Run 10/10: complete` 出现且分析脚本结束后，**仍在 B** 检查本次新数据，不要误拿旧的正式数据冒充当场运行：
 
 ```bash
-head -n 11 "$EXAM_RESULTS/per_run.csv"
-cat "$EXAM_RESULTS/summary.json"
-xdg-open "$EXAM_RESULTS/trajectories.png"
+ls "$EXAM_LOGS"/run_01_odom.csv "$EXAM_LOGS"/run_01_truth.csv
+cat "$EXAM_RESULTS/closed_loop_stats.md"
+xdg-open "$EXAM_RESULTS/trajectory_compare.png"
 ```
 
 这样三步才是“起仿真 → **走 10 次并录制** → 对这 10 次出统计与图”的完整复现。以当前 `0.1 m/s` 速度，每圈约 `68.8 s` 仿真时间，10 圈理论驾驶时间约 `11.5 min`，加上启动和分析会超过原题写的**约 10 分钟现场流程**。因此短场考核时应先出示已经完成的 10 圈证据并现场演示 1 圈；如果考官明确要求当场重跑 10 圈，就采用上面的完整命令并说明预计用时。未经同条件验证，不要为了压缩时间临时提高速度，却把新数据说成原来 `0.1 m/s` 的统计结果。
@@ -34,11 +34,11 @@ xdg-open "$EXAM_RESULTS/trajectories.png"
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
 pwd
-ls results/frame_aligned_repeats_01
+ls results
 head -n 3 results/frame_aligned_repeats_01/per_run.csv
 ```
 
-`pwd` 应以 `M3/M3-1` 结尾，`ls` 应包含 `per_run.csv`、`summary.json`、`trajectories.png`。如果路径或文件不对，先停下检查目录，不要在别处运行脚本。
+`pwd` 应以 `M3/M3-1` 结尾，`ls` 应包含 `per_run.csv`、`summary.json`、`trajectory_compare.png`、`closed_loop_stats.md`。如果路径或文件不对，先停下检查目录，不要在别处运行脚本。
 
 ### 1. 起仿真（终端 A，保持运行）
 
@@ -98,7 +98,8 @@ cat "$DEMO_OUT/run_01/metadata.json"
 ```bash
 cat results/frame_aligned_repeats_01/summary.json
 head -n 11 results/frame_aligned_repeats_01/per_run.csv
-xdg-open results/frame_aligned_repeats_01/trajectories.png
+cat results/closed_loop_stats.md
+xdg-open results/trajectory_compare.png
 ```
 
 先说明 `per_run.csv` 是**每圈一行、共 10 圈**；`summary.json` 的 `std` 是样本标准差（分母 `10−1`）。关键三项：
@@ -109,7 +110,7 @@ xdg-open results/frame_aligned_repeats_01/trajectories.png
 | `truth_closure_m` | **1.40 ± 0.36 cm** | 车实际未回到自身起点的距离；是路线执行偏差。 |
 | `odom_closure_m` | **4.24 ± 0.49 cm** | 里程计认为自己未回起点的距离。 |
 
-图中橙红线为 `/odom`，绿线为 Gazebo 真值，灰虚线为命令几何，黑点为对齐起点，x/y 轴等比例。**诚实说明现有图尚未逐圈标出终点、闭环偏差数字和 2 m 尺寸线**；不要说它已完全满足原题图示格式。需要现场复核统计时，B 可额外运行下列命令；输出只写 `/tmp`，不会改正式数据：
+`results/closed_loop_stats.md` 列出 10 圈各自的真实/里程计位置闭环、归一化后取绝对值的角度闭环和两路终点差。新 `trajectory_compare.png` 单独展示第 1 圈：红线为 `/odom`，绿线为 Gazebo 真值，灰虚线为命令几何，黑点为对齐起点，两个彩色符号为终点；图下方标注闭环偏差与两路终点差，箭头标 2 m 外框，x/y 轴等比例。`trajectories.png` 则另存 10 圈叠加图。需要现场复核统计时，B 可额外运行下列命令；输出只写 `/tmp`，不会改正式数据：
 
 ```bash
 python3 scripts/analyze_repeats.py --runs-dir logs/frame_aligned_repeats_01 --out /tmp/m3_1_live_analysis
@@ -119,7 +120,7 @@ python3 scripts/analyze_repeats.py --runs-dir logs/frame_aligned_repeats_01 --ou
 
 ### 6. 展示 TF 和误差来源（终端 B）
 
-在 **B** 输入 `xdg-open results/tf_tree.pdf`，指出主链 `odom → base_footprint → base_link → lidar_link`。这张 PDF 采自参考点修正前，只用于显示拓扑；最终 `base_footprint → base_link` 的实测固定平移为 `[0.140, 0, 0.050] m`，`base_link → lidar_link` 为 `[0, 0, 0.085] m`。要现场核对时，在 B 逐条运行以下命令，每条看到 `Translation` 后按 `Ctrl+C`，再运行下一条：
+在 **B** 输入 `xdg-open results/tf_tree.pdf`，指出主链 `odom → base_footprint → base_link → lidar_link`。这张最终图由 `scripts/render_tf_tree.py` 从当前展开的 Xacro 和控制器 YAML 生成，逐边标注静态/动态、发布者和固定平移；并明确写出 `map → odom` 当前缺席。最终 `base_footprint → base_link` 的实测固定平移为 `[0.140, 0, 0.050] m`，`base_link → lidar_link` 为 `[0, 0, 0.085] m`。如需现场核对，在 B 逐条运行以下命令，每条看到 `Translation` 后按 `Ctrl+C`，再运行下一条：
 
 ```bash
 ros2 run tf2_ros tf2_echo base_footprint base_link
@@ -486,7 +487,7 @@ python3 scripts/analyze_repeats.py --runs-dir logs/square_repeats_01 --out resul
 
 ## TF 坐标系现场检查
 
-在 Gazebo 运行时执行 `ros2 run tf2_tools view_frames --ros-args -p use_sim_time:=true`，得到 [`results/tf_tree.pdf`](results/tf_tree.pdf)、[`results/tf_tree.gv`](results/tf_tree.gv) 和便于预览的 [`results/tf_tree.png`](results/tf_tree.png)。这张图来自**参考点修正前**的运行，实测主链为：
+在 Gazebo 运行时执行 `ros2 run tf2_tools view_frames --ros-args -p use_sim_time:=true`，得到历史截图 [`results/tf_tree_before_footprint.pdf`](results/tf_tree_before_footprint.pdf)、[`results/tf_tree_before_footprint.gv`](results/tf_tree_before_footprint.gv) 和 [`results/tf_tree_before_footprint.png`](results/tf_tree_before_footprint.png)。这张图来自**参考点修正前**的运行，实测主链为：
 
 ```text
 odom ──动态，约 50 Hz──> base_footprint ──固定──> base_link ──固定──> lidar_link
@@ -508,11 +509,15 @@ odom ──动态，约 50 Hz──> base_footprint ──固定──> base_lin
 
 已将源码中的 `base_footprint_joint` 改为 `base_link` 相对后轴地面点前移 0.14 m、上移 0.05 m，使 TF 名称与控制器的积分参考点一致。重新构建并重启 Gazebo 后，`tf2_echo base_footprint base_link` 实测平移 `[0.140, 0.000, 0.050] m`、旋转为零。新采集目录的 `metadata.json` 写入 `truth_forward_offset_m: 0.0`，分析器按每次采集的元数据选择换算距离；旧目录没有此字段时仍按旧版 0.14 m 分析。
 
+最终提交的 [`results/tf_tree.pdf`](results/tf_tree.pdf) 是使用 `scripts/render_tf_tree.py` 从**当前** Xacro 展开结果和控制器 YAML 绘制的注释图，不是上面历史 `view_frames` 的原始截图。图上逐边标明静态/动态、发布者和主要物理位置，`map → odom` 明确标为本阶段未发布。重新生成需先加载 ROS 环境，再运行 `python3 scripts/render_tf_tree.py`；可用上面的 `tf2_echo` 现场核实固定平移。
+
 修正后单圈试采 `logs/frame_aligned_pilot` 完成 3623 条里程计与 1449 条真值。无需再后移 Gazebo 真值，两路轨迹的全程平均距离为 **0.01757 m**、终点距离为 **0.02679 m**；Gazebo 自身闭环距离为 0.01966 m，里程计自身为 0.04634 m。如果错误地继续后移 0.14 m，平均轨迹距离反而变为 **0.15476 m**。这验证了新模型位姿的参考点已发生预期变化，且驾驶链路仍可工作。单圈试采本身不能给出均值与标准差；最终车模的正式 10 圈结果见下一节。旧版 10 圈与 TF 图继续作为改动前对照，不能冒充新版验证。
 
 ## 最终车模的正式 10 圈结果
 
 最终数据位于 `logs/frame_aligned_repeats_01/run_01` 至 `run_10`。10 圈均由自动驾驶脚本正常结束、元数据均标记 `complete` 和 `truth_forward_offset_m: 0.0`，每圈约 3623–3624 条里程计、1449–1450 条真值；所有 CSV 时间戳严格递增。`scripts/analyze_repeats.py` 输出逐圈指标 [`results/frame_aligned_repeats_01/per_run.csv`](results/frame_aligned_repeats_01/per_run.csv)、汇总 [`summary.json`](results/frame_aligned_repeats_01/summary.json) 和等比例叠加图 [`trajectories.png`](results/frame_aligned_repeats_01/trajectories.png)。
+
+对正式 10 圈再次执行 `python3 scripts/analyze.py --logs logs/frame_aligned_repeats_01 --out results`，还生成了原题命名的 [`results/closed_loop_stats.md`](results/closed_loop_stats.md) 与 [`results/trajectory_compare.png`](results/trajectory_compare.png)。前者逐圈列出位置和绝对角度闭环，并给出均值 ± 样本标准差；后者用红色里程计、绿色真值对比第 1 圈，标出起点、两个终点、偏差数值与 2 m 外框，坐标等比例。`scripts/square_driver.py --laps 10 --side 2.0 --out <新目录>` 可从零生成独立的 10 圈数据，同时保存分圈目录和原题示例的平铺 CSV 文件名。
 
 | 最终配置的指标 | 10 圈均值 ± 样本标准差 |
 | :-- | --: |

@@ -1,17 +1,35 @@
-digraph G {
-"base_footprint" -> "base_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
-"odom" -> "base_footprint"[label=" Broadcaster: default_authority\nAverage rate: 50.203\nBuffer length: 4.92\nMost recent transform: 1240.304\nOldest transform: 1235.384\n"];
-"base_link" -> "camera_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
-"camera_link" -> "camera_optical_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
-"base_link" -> "lidar_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
-"base_link" -> "front_left_steering_link"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-"front_left_steering_link" -> "front_left_wheel"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-"base_link" -> "front_right_steering_link"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-"front_right_steering_link" -> "front_right_wheel"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-"base_link" -> "rear_left_wheel"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-"base_link" -> "rear_right_wheel"[label=" Broadcaster: default_authority\nAverage rate: 16.87\nBuffer length: 4.92\nMost recent transform: 1240.264\nOldest transform: 1235.344\n"];
-edge [style=invis];
- subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
-"Recorded at time: 1240.32"[ shape=plaintext ] ;
-}->"odom";
+digraph M3_1_final_TF {
+  graph [rankdir=TB, bgcolor="white", fontname="DejaVu Sans",
+         label="M3-1 final TF topology (derived from expanded Xacro + controller YAML)\nmap -> odom is absent: no localization or SLAM in this task",
+         labelloc=t, fontsize=18, pad=0.3, nodesep=0.4, ranksep=0.8];
+  node [shape=box, style="rounded,filled", fillcolor="#f7f9fb",
+        color="#738496", fontname="DejaVu Sans", fontsize=11];
+  edge [fontname="DejaVu Sans", fontsize=9, arrowsize=0.7];
+  "base_footprint" [label="base_footprint\nrear-axle ground point"];
+  "base_link" [label="base_link\nvehicle body"];
+  "camera_link" [label="camera_link\ncamera mount"];
+  "camera_optical_link" [label="camera_optical_link"];
+  "front_left_steering_link" [label="front_left_steering_link"];
+  "front_left_wheel" [label="front_left_wheel"];
+  "front_right_steering_link" [label="front_right_steering_link"];
+  "front_right_wheel" [label="front_right_wheel"];
+  "lidar_link" [label="lidar_link\nlaser mount"];
+  "odom" [label="odom\ncontinuous local frame"];
+  "rear_left_wheel" [label="rear_left_wheel"];
+  "rear_right_wheel" [label="rear_right_wheel"];
+  "odom" -> "base_footprint" [label="dynamic ~50 Hz\nackermann_steering_controller", color="#b3262b", fontcolor="#b3262b"];
+  "base_footprint" -> "base_link" [label="static\nrobot_state_publisher\nxyz=0.140 0.000 0.050", color="#2267a0", fontcolor="#2267a0"];
+  "base_link" -> "front_left_steering_link" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "front_left_steering_link" -> "front_left_wheel" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "base_link" -> "front_right_steering_link" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "front_right_steering_link" -> "front_right_wheel" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "base_link" -> "rear_left_wheel" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "base_link" -> "rear_right_wheel" [label="dynamic\nrobot_state_publisher\nuses /joint_states", color="#b3262b", fontcolor="#b3262b"];
+  "base_link" -> "lidar_link" [label="static\nrobot_state_publisher\nxyz=0.000 0.000 0.085", color="#2267a0", fontcolor="#2267a0"];
+  "base_link" -> "camera_link" [label="static\nrobot_state_publisher\nxyz=0.220 0.000 0.120", color="#2267a0", fontcolor="#2267a0"];
+  "camera_link" -> "camera_optical_link" [label="static\nrobot_state_publisher", color="#2267a0", fontcolor="#2267a0"];
+  "map_note" [shape=note, fillcolor="#fff7e5", color="#be8124",
+              label="map -> odom: NOT PUBLISHED\nFuture SLAM/localization would provide it"];
+  "map_note" -> "odom" [style=invis];
+  {rank=same; "map_note"; "odom";}
 }
