@@ -1,5 +1,116 @@
 # M3-1｜坐标系与里程计
 
+## 现场考核操作清单（两终端，约 10 分钟）
+
+这份清单从启动到退出可以独立照做。**终端 A/B 是按用途命名，不是打开的先后序号**：A 专门运行 Gazebo，B 专门检查、试跑和展示结果。只用 Ubuntu；每个新终端都要各自 `source` 环境。现场跑 **1 圈**证明代码能工作；已有的正式 **10 圈**用于展示统计，不必在 10 分钟内重新采 10 圈。以下所有命令的工作目录都是本项目 `M3/M3-1`。
+
+### 考前检查（终端 B）
+
+先打开一个 Ubuntu 终端，把它当作 **B**。确认进入正确目录，正式结果已在磁盘上：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+pwd
+ls results/frame_aligned_repeats_01
+head -n 3 results/frame_aligned_repeats_01/per_run.csv
+```
+
+`pwd` 应以 `M3/M3-1` 结尾，`ls` 应包含 `per_run.csv`、`summary.json`、`trajectories.png`。如果路径或文件不对，先停下检查目录，不要在别处运行脚本。
+
+### 1. 起仿真（终端 A，保持运行）
+
+新开一个 Ubuntu 终端作为 **A**，输入：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch smart_car_description sim.launch.py
+```
+
+等 Gazebo 窗口出现、日志显示 `joint_state_broadcaster` 与 `ackermann_steering_controller` 已激活。A 不出现 `$` 提示符是正常的，因为仿真正在运行；**后续命令不要输入 A**。如果 Gazebo 原本已在某个终端正常运行，把那个终端当 A，勿重复启动。
+
+### 2. 验证控制和数据源（终端 B）
+
+回到 **B**，输入：
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 topic list | grep -E '^/(cmd_vel|odom|gazebo/model_states|tf|tf_static)$'
+ros2 topic info /cmd_vel
+```
+
+应看到 5 个话题，`/cmd_vel` 类型为 `geometry_msgs/msg/Twist` 且 `Subscription count: 1`。此时 `Publisher count: 0` 正常：驾驶脚本尚未启动。`/odom` 是轮里程计估计，`/gazebo/model_states` 是仿真真值。若没有 `/odom`，回 A 查控制器日志，不要继续试跑。老师要看消息帧名时，在 B 执行 `ros2 topic echo /odom --once`，指出 `frame_id: odom` 和 `child_frame_id: base_footprint`。
+
+### 3. 现场跑一圈并自动记录（终端 B；A 继续运行）
+
+在 **B** 输入下面三行。`DEMO_OUT` 仅在 B 中有效；日期时间后缀创建新日志目录，避免覆盖正式数据。运行时不要暂停 Gazebo，也不要按 `Ctrl+C`。
+
+```bash
+DEMO_OUT="logs/live_demo_$(date +%Y%m%d_%H%M%S)"
+echo "$DEMO_OUT"
+python3 scripts/run_trials.py --runs 1 --side 2.0 --radius 0.65 --speed 0.1 --out "$DEMO_OUT"
+```
+
+等约 **69 秒仿真时间**，终端 B 应显示 `Run 1/1: complete` 并回到 `$`。向考官解释：阿克曼车不能原地转；外框边长 2 m、圆弧半径 0.65 m，每段直线 `2−2×0.65=0.70 m`，直行时间 `0.70/0.1=7.0 s`；每个 90° 转弯时间 `π×0.65/(2×0.1)≈10.2 s`，一圈约 68.8 s。程序按仿真时间发命令，同时录两路数据，Gazebo 真值只用于对照、没有参与驾驶控制。
+
+### 4. 检查现场新数据（终端 B）
+
+不要关闭 B，因为 `DEMO_OUT` 变量还在这个终端。输入：
+
+```bash
+ls "$DEMO_OUT/run_01"
+head -n 3 "$DEMO_OUT/run_01/odom.csv"
+head -n 3 "$DEMO_OUT/run_01/truth.csv"
+cat "$DEMO_OUT/run_01/metadata.json"
+```
+
+应有 `odom.csv`、`truth.csv`、`metadata.json`；两个 CSV 表头都为 `t,x,y,theta`，`metadata.json` 中 `"complete": true`、`"truth_forward_offset_m": 0.0`。两路原始 `x/y/theta` 起点不一样，不可把第一行的差直接叫漂移；分析时先将它们各自对齐到相同起点和朝向。**一圈只证明现场可运行，不能从它计算 10 圈标准差。**
+
+### 5. 展示已有正式 10 圈统计和图（终端 B）
+
+在 **B** 输入：
+
+```bash
+cat results/frame_aligned_repeats_01/summary.json
+head -n 11 results/frame_aligned_repeats_01/per_run.csv
+xdg-open results/frame_aligned_repeats_01/trajectories.png
+```
+
+先说明 `per_run.csv` 是**每圈一行、共 10 圈**；`summary.json` 的 `std` 是样本标准差（分母 `10−1`）。关键三项：
+
+| 字段 | 应说出的结果 | 含义 |
+| :-- | :-- | :-- |
+| `endpoint_disagreement_m` | **3.37 ± 0.46 cm** | 起点和参考点对齐后，里程计终点与 Gazebo 真值终点之差，主要漂移指标。 |
+| `truth_closure_m` | **1.40 ± 0.36 cm** | 车实际未回到自身起点的距离；是路线执行偏差。 |
+| `odom_closure_m` | **4.24 ± 0.49 cm** | 里程计认为自己未回起点的距离。 |
+
+图中橙红线为 `/odom`，绿线为 Gazebo 真值，灰虚线为命令几何，黑点为对齐起点，x/y 轴等比例。**诚实说明现有图尚未逐圈标出终点、闭环偏差数字和 2 m 尺寸线**；不要说它已完全满足原题图示格式。需要现场复核统计时，B 可额外运行下列命令；输出只写 `/tmp`，不会改正式数据：
+
+```bash
+python3 scripts/analyze_repeats.py --runs-dir logs/frame_aligned_repeats_01 --out /tmp/m3_1_live_analysis
+```
+
+应打印 `endpoint_disagreement_m: 0.03371 ± 0.00455`（单位 m）。
+
+### 6. 展示 TF 和误差来源（终端 B）
+
+在 **B** 输入 `xdg-open results/tf_tree.pdf`，指出主链 `odom → base_footprint → base_link → lidar_link`。这张 PDF 采自参考点修正前，只用于显示拓扑；最终 `base_footprint → base_link` 的实测固定平移为 `[0.140, 0, 0.050] m`，`base_link → lidar_link` 为 `[0, 0, 0.085] m`。要现场核对时，在 B 逐条运行以下命令，每条看到 `Translation` 后按 `Ctrl+C`，再运行下一条：
+
+```bash
+ros2 run tf2_ros tf2_echo base_footprint base_link
+ros2 run tf2_ros tf2_echo base_link lidar_link
+```
+
+口述：`odom → base_footprint` 是阿克曼控制器发布的**动态**变换；车体与雷达的两个固定关节由 `robot_state_publisher` 发布**静态**变换；`map → odom` 本阶段**不存在**，将来由 SLAM/定位系统提供。`map` 给长期地图参照，`odom` 连续但会漂，`base_link` 是车体，`lidar_link` 是雷达。
+
+误差来源的结论是：早期左/右前轮配置顺序错误已通过关节角和单转弯复测证实、并已修正；最终 10 圈剩余航向差主要在四次转弯中累积（合计约 `−1.70°`），直线段约 `−0.05°`。打滑、几何标定和模型近似都可能贡献剩余误差；**仅凭这两路位姿轨迹不能证明打滑**。
+
+### 7. 安全结束（先 B，后 A）
+
+关掉图片/PDF 窗口；若 B 的 `tf2_echo` 还在输出，先在 B 按 `Ctrl+C` 回到提示符。随后到 **A**，在运行 `ros2 launch` 的终端按一次 `Ctrl+C`，等 Gazebo 子进程退出、A 回到提示符，再关闭两个终端。现场新 `live_demo_*` 日志不必删除，也不必提交 Git。切勿覆盖或删除 `logs/frame_aligned_repeats_01` 与 `results/frame_aligned_repeats_01`。
+
 ## 最终结论速览
 
 最终车模在 Ubuntu 22.04、ROS 2 Humble、Gazebo Classic 中完成了 10 圈 2 m 外框的圆角方形实验。每圈单独采集 `/odom` 与 Gazebo 真值并对齐到同一个后轴地面参考点。**里程计终点相对真值的漂移为 3.37 ± 0.46 cm（10 圈均值 ± 样本标准差）**；逐圈结果见 [`per_run.csv`](results/frame_aligned_repeats_01/per_run.csv)，轨迹叠加见 [`trajectories.png`](results/frame_aligned_repeats_01/trajectories.png)。小车实际未回到起点的闭环距离另为 **1.40 ± 0.36 cm**，不能与里程计漂移混为一谈。
