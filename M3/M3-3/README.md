@@ -191,3 +191,84 @@ python3 scripts/run_repeats.py --runs 3 --out results/nav_repeats_tuned_02
 所有隔离试验进程均已退出。后续升级或更换 Nav2 版本时应复查关闭行为。
 Nav2 上游也有[组件容器在生命周期管理器退出时崩溃的报告](https://github.com/ros-navigation/navigation2/issues/6690)；
 该报告使用 Jazzy，不能直接断定这里的 Humble 崩溃有相同根因。
+
+## 现场展示：哪个终端执行什么
+
+原题现场约 18 分钟：一条命令启动仿真、定位与 Nav2；考官在**本地图上临时指定一个目标**，跑两次；展示参数前后记录、代价地图、路径和速度曲线。历史固定目标 `(11, 3, 90°)` 的三次成功记录是准备材料，不能代替考官指定的两次。下面用两个 Ubuntu 终端和 RViz 窗口操作。
+
+### 1. 终端 A：只负责启动和保持仿真运行
+
+先退出其他 Gazebo、SLAM 和 Nav2。新开终端 A，逐行执行：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-3
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+source install/setup.bash
+ros2 launch smart_car_navigation localization.launch.py gui:=true rviz:=true navigation:=true
+```
+
+终端 A 会持续输出日志，不会马上返回提示符。Gazebo 用于看仿真车与场景；RViz 用于看保存的地图、目标、路径和代价地图。不要再分别手工启动第二套 Gazebo、AMCL 或 Nav2。
+
+### 2. 终端 B：检查状态，再发送考官目标
+
+另开终端 B。每个新终端都要独立加载环境：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-3
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+source install/setup.bash
+ros2 lifecycle get /map_server
+ros2 lifecycle get /amcl
+ros2 lifecycle get /planner_server
+ros2 lifecycle get /controller_server
+```
+
+四个节点应为 `active [3]`。`map_server` 发布 M3-2 的保存地图；AMCL 依据地图与激光发布 `map→odom`；规划器计算路径；控制器把路径跟随结果发到 `/cmd_vel`。如果刚启动时 AMCL 尚未更新，先等几秒；必要时在 B 用已验证的低速脚本前进 0.3 m，再检查定位：
+
+```bash
+python3 ../M3-2/scripts/drive_route.py --straight-test 0.3 --straight-speed 0.1
+ros2 topic echo /amcl_pose --once --field pose.pose.position
+```
+
+请考官在 RViz **白色已知空闲区**给出地图目标 X、Y 和终点朝向（度），并确认计划路线超过 5 m、包含转弯。黑色是障碍，灰色是未知区；不能把目标点放在其中。例如 `(7, 7)` 在本项目正式地图中是黑色占据格，不能作为有效目标。由 B 逐项输入考官给的数字，然后运行：
+
+```bash
+read -r -p '目标地图 X: ' GOAL_X
+read -r -p '目标地图 Y: ' GOAL_Y
+read -r -p '终点朝向（度）: ' GOAL_YAW
+mkdir -p results/onsite_live
+python3 scripts/run_nav_trial.py --goal-x "$GOAL_X" --goal-y "$GOAL_Y" --goal-yaw-deg "$GOAL_YAW" --min-travel 5 | tee results/onsite_live/goal_01.log
+```
+
+参数名必须是**小写** `--goal-x`；`--goal-X` 会报 `unrecognized arguments`。脚本按 `map` 坐标发送目标，并打印当前位置、剩余距离、动作耗时、终点位置误差及 `SUCCEEDED` 或失败原因。`--min-travel 5` 检查的是首尾里程计位移；若考官给的是绕行长度超过 5 m、但首尾直线距离不足 5 m 的路线，需用路径数据单独证明“路径超过 5 m”，不能把此位移检查当成路径长度。
+
+### 3. 同一目标再跑一次
+
+第一次结束后，在终端 A 按 `Ctrl+C`，等 Gazebo 完全退出，再在 **A** 重跑上面的 `ros2 launch` 命令。脚本要求车从起点附近出发；因此不要在第一趟的终点直接发送第二次目标。终端 B 保持打开，重新检查四个生命周期节点，然后用同样的三个目标变量执行：
+
+```bash
+python3 scripts/run_nav_trial.py --goal-x "$GOAL_X" --goal-y "$GOAL_Y" --goal-yaw-deg "$GOAL_YAW" --min-travel 5 | tee results/onsite_live/goal_02.log
+```
+
+两次成功、失败都保留日志并如实报告。若使用 RViz 的 `2D Goal Pose` 鼠标发送目标，就不要同时让脚本再发送另一目标；终端脚本更便于记录耗时和终点误差。
+
+### 4. 终端 B 与 RViz：讲清调参和现场证据
+
+在 **B** 查看完整配置差异和历史三次统计：
+
+```bash
+diff -u results/nav_pilot_01/navigation_baseline.yaml results/nav_tuned_pilot_01/navigation_tuned.yaml
+cat results/nav_repeats_tuned/summary.json
+ros2 topic info /cmd_vel
+ros2 topic list | grep -E '^/(plan|global_costmap/costmap|local_costmap/costmap)$'
+```
+
+解释三个改动：目标速度 `0.15→0.18 m/s`、前视距离 `0.45→0.40 m`、位置到点容差 `0.20→0.15 m`；说明速度更快可能减少反应余量，前视更短可能增加转向修正，容差更严格可能增加末段调整。三项同时改变，不能把总耗时变化归因于其中某一项。历史固定目标三次成功为 `3/3`，成功耗时 `71.2 ± 0.1 s`，不是现场新目标的结果。
+
+在 **RViz 窗口**展示 `/plan` 全局路径、`/global_costmap/costmap` 和 `/local_costmap/costmap`，并在车运动时截图，保留能看出转弯与实际轨迹的画面。若要画 `/cmd_vel` 角速度曲线，另开**终端 C**，加载 `/opt/ros/humble/setup.bash` 后运行 `ros2 run rqt_plot rqt_plot /cmd_vel/angular/z`；曲线必须在车辆运动时观察。全部结束后，在终端 A 按 `Ctrl+C` 安全关闭仿真。
+
+2026-11-22 在恢复后的正式地图和代码上做过一次**无 GUI 自动复核**：固定目标 `(11, 3, 90°)` 导航成功，动作耗时 71.1 s，终点误差 0.13 m，真值轨迹长 12.43 m。该本机记录在 `results/onsite_check_20261122_04/`，不属于考官临时目标的两次现场记录，也没有提交到 Git。
