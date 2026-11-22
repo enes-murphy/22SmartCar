@@ -1,6 +1,8 @@
 """Launch the M3-1 empty world, robot model, and Gazebo spawn process."""
 
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -11,9 +13,19 @@ from launch.substitutions import Command
 from launch_ros.actions import Node
 
 
+def gazebo_endpoint(uri):
+    """Compare local Gazebo masters by port, including localhost aliases."""
+    parsed = urlparse(uri or "http://127.0.0.1:11345")
+    host = parsed.hostname or "127.0.0.1"
+    if host in ("localhost", "::1"):
+        host = "127.0.0.1"
+    return host, parsed.port or 11345
+
+
 def existing_gazebo_servers(proc_root=Path("/proc")):
-    """Find Gazebo Classic servers before starting this assessment world."""
+    """Find servers sharing this launch's Gazebo master, not isolated trials."""
     servers = []
+    expected = gazebo_endpoint(os.environ.get("GAZEBO_MASTER_URI"))
     for entry in proc_root.iterdir():
         if not entry.name.isdigit():
             continue
@@ -23,6 +35,11 @@ def existing_gazebo_servers(proc_root=Path("/proc")):
             args = (entry / "cmdline").read_bytes().split(b"\0")
             world = next((Path(arg.decode(errors="replace")).name for arg in args
                           if arg.endswith(b".world")), "unknown world")
+            variables = (entry / "environ").read_bytes().split(b"\0")
+            master = next((item.split(b"=", 1)[1].decode(errors="replace")
+                           for item in variables if item.startswith(b"GAZEBO_MASTER_URI=")), None)
+            if gazebo_endpoint(master) != expected:
+                continue
             servers.append((int(entry.name), world))
         except (FileNotFoundError, PermissionError, ProcessLookupError):
             # A process can exit while /proc is being read.

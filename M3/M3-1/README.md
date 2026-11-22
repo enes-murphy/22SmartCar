@@ -36,25 +36,25 @@
 
 ## 按展示指南现场执行
 
-**考前｜终端 A。** 在 M3-1 目录构建；`colcon build` 要成功。**预热之前先确认没有别的仿真。** 本机的 M3-2 `sim_slam.launch.py` 和 M3-3 `localization.launch.py` 都会启动 `scene.world`。即使它们设置了 `gui:=false`，Gazebo 服务器仍会运行；同时开多个服务器时，图形窗口可能显示另一任务的围墙/雷达，控制器也可能报 `already loaded`。这不是 `square.world` 文件被修改。
+**考前｜终端 A。** 在 M3-1 目录构建；`colcon build` 要成功。**预热之前先检查 M3-1 要用的 Gazebo 地址。** M3-2/M3-3 的普通仿真也会启动 `scene.world`，可能与 M3-1 共用默认端口 11345；即使设置 `gui:=false`，Gazebo 服务器仍会运行。M3-4 的自动试验则可能在另一个端口运行；只看 `pgrep -af gzserver` 会把它误认成冲突。这个检查只拦截占用**同一 Gazebo 地址**的服务器：
 
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
 source /opt/ros/humble/setup.bash
 colcon build --base-paths src --symlink-install
 source install/setup.bash
-pgrep -af 'ros2 launch|gzserver' || true
+python3 scripts/check_gazebo.py
 ```
 
-如果最后一条命令有输出，**先不要执行下面的启动命令**。到输出中对应的 M3-2/M3-3/其他仿真终端按 Ctrl+C，等退出后再查一次；找不到原终端时，先用 `pgrep -af 'ros2 launch'` 确认启动器 PID，再用 `kill -TERM <启动器PID>` 结束它。如果启动器已经退出而只剩孤立的 `gzserver`，仅对确认属于旧仿真的 PID 使用 `kill -TERM <旧gzserver的PID>`。直到 `pgrep -af 'ros2 launch|gzserver'` 没有输出，才在终端 A 预热：
+看到 `OK: ... is free for M3-1` 才执行下一条。若显示 `STOP` 和 `scene.world`，先用 `pgrep -af 'ros2 launch|run_experiment.py|run_repeats.py'` 找到启动它的终端，在那里按 Ctrl+C；脚本批量运行时会反复生成新的 PID，只杀一个 `gzserver` 不够。找不到启动终端时，把检查器给出的 PID 和进程列表保存下来，再确定对应启动器；不要盲目关闭其他端口上的 M3-4 试验。停止冲突任务后重新运行 `python3 scripts/check_gazebo.py`，直到显示 `OK`。
 
 ```bash
 ros2 launch smart_car_description sim.launch.py
 ```
 
-M3-1 启动文件也会在发现已有 `gzserver` 时直接报出 PID 和世界文件名并停止，避免误把 M3-2 场景当成 M3-1。预热成功后，另开终端执行 `pgrep -af gzserver`：应**只有一个**进程，命令行含 `M3/M3-1` 和 `square.world`，画面应是空地。保留原始 10 圈 CSV 在本机。预热结束时在终端 A 按 Ctrl+C；待 Gazebo 退出、`pgrep -af 'ros2 launch|gzserver'` 没有输出后，才能再次启动。
+M3-1 启动文件也会拒绝与同一 Gazebo 地址的已有世界共存；ROS 随后的 `InvalidFrontendLaunchFileError` 是加载失败时附带的通用提示，前面的 `RuntimeError` 才是具体原因。预热成功后，在**终端 B**加载下方环境，再执行 `python3 scripts/check_gazebo.py --expect-world square.world`：应显示 M3-1 的唯一服务器，画面应是空地。保留原始 10 圈 CSV 在本机。预热结束时在终端 A 按 Ctrl+C；待 `python3 scripts/check_gazebo.py` 再次显示 `OK: ... is free` 后，才能再次启动。
 
-**1 起仿真｜终端 A，保持运行。** 正式展示时先按上面的进程检查确认没有其他仿真，再在同一终端运行 `ros2 launch smart_car_description sim.launch.py`。等 Gazebo 空地出现且控制器激活；此终端暂时不会回到提示符。整个 M3-1 展示期间不要同时启动 M3-2 或 M3-3 仿真。
+**1 起仿真｜终端 A，保持运行。** 正式展示时先运行 `python3 scripts/check_gazebo.py` 确认端口空闲，再在同一终端运行 `ros2 launch smart_car_description sim.launch.py`。等 Gazebo 空地出现且控制器激活；此终端暂时不会回到提示符。整个 M3-1 展示期间不要在同一个 Gazebo 地址上启动 M3-2 或 M3-3 仿真。
 
 **2 查里程计｜另开终端 B。** 每个新终端都要自行加载环境：
 
@@ -62,6 +62,7 @@ M3-1 启动文件也会在发现已有 `gzserver` 时直接报出 PID 和世界�
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
 source /opt/ros/humble/setup.bash
 source install/setup.bash
+python3 scripts/check_gazebo.py --expect-world square.world
 ros2 topic hz /odom
 ```
 
