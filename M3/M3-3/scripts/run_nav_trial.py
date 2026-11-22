@@ -3,6 +3,7 @@
 
 import argparse
 import math
+import sys
 import time
 
 import rclpy
@@ -119,8 +120,10 @@ def main():
         if distance_moved < args.min_travel or error > 0.25:
             raise RuntimeError("Nav2 status succeeded but measured movement/pose did not")
         print("SUCCEEDED: Nav2 reached the turning-route target", flush=True)
+        return 0
     except KeyboardInterrupt:
         print("Interrupted: canceling Nav2 goal and stopping", flush=True)
+        return 130
     finally:
         if handle is not None and not done:
             cancel = handle.cancel_goal_async()
@@ -135,4 +138,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
