@@ -36,17 +36,25 @@
 
 ## 按展示指南现场执行
 
-**考前｜终端 A。** 在 M3-1 目录构建并预热 Gazebo；`colcon build` 要成功。预热后按 Ctrl+C 退出，正式展示时再启动。保留原始 10 圈 CSV 在本机。
+**考前｜终端 A。** 在 M3-1 目录构建；`colcon build` 要成功。**预热之前先确认没有别的仿真。** 本机的 M3-2 `sim_slam.launch.py` 和 M3-3 `localization.launch.py` 都会启动 `scene.world`。即使它们设置了 `gui:=false`，Gazebo 服务器仍会运行；同时开多个服务器时，图形窗口可能显示另一任务的围墙/雷达，控制器也可能报 `already loaded`。这不是 `square.world` 文件被修改。
 
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
 source /opt/ros/humble/setup.bash
 colcon build --base-paths src --symlink-install
 source install/setup.bash
+pgrep -af 'ros2 launch|gzserver' || true
+```
+
+如果最后一条命令有输出，**先不要执行下面的启动命令**。到输出中对应的 M3-2/M3-3/其他仿真终端按 Ctrl+C，等退出后再查一次；找不到原终端时，先用 `pgrep -af 'ros2 launch'` 确认启动器 PID，再用 `kill -TERM <启动器PID>` 结束它。如果启动器已经退出而只剩孤立的 `gzserver`，仅对确认属于旧仿真的 PID 使用 `kill -TERM <旧gzserver的PID>`。直到 `pgrep -af 'ros2 launch|gzserver'` 没有输出，才在终端 A 预热：
+
+```bash
 ros2 launch smart_car_description sim.launch.py
 ```
 
-**1 起仿真｜终端 A，保持运行。** 如已结束预热，在同一终端再次运行 `ros2 launch smart_car_description sim.launch.py`。等 Gazebo 出现且控制器激活；此终端暂时不会回到提示符。
+M3-1 启动文件也会在发现已有 `gzserver` 时直接报出 PID 和世界文件名并停止，避免误把 M3-2 场景当成 M3-1。预热成功后，另开终端执行 `pgrep -af gzserver`：应**只有一个**进程，命令行含 `M3/M3-1` 和 `square.world`，画面应是空地。保留原始 10 圈 CSV 在本机。预热结束时在终端 A 按 Ctrl+C；待 Gazebo 退出、`pgrep -af 'ros2 launch|gzserver'` 没有输出后，才能再次启动。
+
+**1 起仿真｜终端 A，保持运行。** 正式展示时先按上面的进程检查确认没有其他仿真，再在同一终端运行 `ros2 launch smart_car_description sim.launch.py`。等 Gazebo 空地出现且控制器激活；此终端暂时不会回到提示符。整个 M3-1 展示期间不要同时启动 M3-2 或 M3-3 仿真。
 
 **2 查里程计｜另开终端 B。** 每个新终端都要自行加载环境：
 

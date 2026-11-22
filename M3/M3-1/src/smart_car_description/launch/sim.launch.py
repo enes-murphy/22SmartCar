@@ -11,7 +11,35 @@ from launch.substitutions import Command
 from launch_ros.actions import Node
 
 
+def existing_gazebo_servers(proc_root=Path("/proc")):
+    """Find Gazebo Classic servers before starting this assessment world."""
+    servers = []
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            if (entry / "comm").read_text().strip() != "gzserver":
+                continue
+            args = (entry / "cmdline").read_bytes().split(b"\0")
+            world = next((Path(arg.decode(errors="replace")).name for arg in args
+                          if arg.endswith(b".world")), "unknown world")
+            servers.append((int(entry.name), world))
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            # A process can exit while /proc is being read.
+            continue
+    return sorted(servers)
+
+
 def generate_launch_description():
+    servers = existing_gazebo_servers()
+    if servers:
+        details = ", ".join(f"PID {pid} ({world})" for pid, world in servers)
+        raise RuntimeError(
+            "M3-1 launch stopped: Gazebo is already running: " + details + ". "
+            "Close the other simulation in its launch terminal (Ctrl+C), "
+            "check that 'pgrep -af gzserver' has no output, then retry."
+        )
+
     share = Path(get_package_share_directory("smart_car_description"))
     gazebo_share = Path(get_package_share_directory("gazebo_ros"))
     world = share / "worlds" / "square.world"
