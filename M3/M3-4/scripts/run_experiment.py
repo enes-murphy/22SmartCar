@@ -41,7 +41,7 @@ def run_one(index, run_dir, config, domain, args):
         with (run_dir / 'launch.log').open('w') as stream:
             launch = subprocess.Popen(
                 ['ros2', 'launch', 'smart_car_navigation', 'localization.launch.py',
-                 'gui:=false', 'rviz:=false', 'navigation:=false'], env=env, stdout=stream,
+                 f'gui:={str(args.gui).lower()}', 'rviz:=false', 'navigation:=false'], env=env, stdout=stream,
                 stderr=subprocess.STDOUT, start_new_session=True)
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
@@ -151,6 +151,7 @@ def main():
     parser.add_argument('--goal-y', type=float, default=0.4)
     parser.add_argument('--goal-yaw-deg', type=float, default=0.0)
     parser.add_argument('--no-obstacle', action='store_true')
+    parser.add_argument('--gui', action='store_true', help='show Gazebo during a live demonstration')
     parser.add_argument('--max-preflight-attempts', type=int, default=20)
     parser.add_argument('--resume', action='store_true',
                         help='continue an interrupted batch without repeating completed runs')

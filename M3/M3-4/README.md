@@ -61,3 +61,58 @@ M3-4/
 ├── report.md        # 数据解释、局限与失效边界
 └── README.md
 ```
+
+## 现场演示速用流程
+
+以下命令在**一个新 Ubuntu 终端**依次执行。Gazebo 是第二个窗口，用来观察车和箱子，不需要在那里手动放模型。`run_experiment.py` 自动启动 Gazebo、定位和导航；`--gui` 显示 Gazebo。每次给 `--out` 一个不存在的新目录。演示前先关闭其他 Gazebo/Nav2 会话，避免混用仿真。
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-4
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+source ../M3-3/install/setup.bash
+DEMO="results/live_$(date +%Y%m%d_%H%M%S)"
+python3 scripts/run_experiment.py --config short --runs 1 --delay 3 --world-x -1 --world-y -3.35 --size-x .30 --size-y .30 --gui --max-preflight-attempts 4 --first-domain 180 --out "$DEMO"
+cat "$DEMO/summary.json"
+cat "$DEMO/run_01/trial.log"
+```
+
+按 Enter 后，小车**不会立即开动**：程序先启动 Gazebo、AMCL 定位和 Nav2，再做短距离预热。待 `trial.log` 出现 `Goal accepted at sim ...`，导航才开始；小车应开始向目标行驶。随后日志出现 `Obstacle inserted at sim ...`，Gazebo 中应看到新箱子。等终端重新出现 `$`，再运行上面的两条 `cat` 查看结果。`summary.json` 的 `successes` 为 1 表示到点；为 0 则查看 `run_01/summary.json` 中的 `outcome` 和 `trial.log`。运行中先不要重复输入同一命令或手动发第二个目标。
+
+Gazebo 窗口展示接近、出现障碍、改道、通过，现场截图或录屏保存。脚本目前从**目标被接受**起计 3 个仿真秒，模型服务实际完成会晚少许；口述时按 `trial.log` 中的两条时间戳说明。2026-11-22 彩排中，目标在仿真 27.110 秒被接受，箱子在 30.250 秒生成，相差 3.14 秒，车成功到点；记录在 `results/live_rehearsal_20261122/`。历史 `results/short_10`、`long_10`、`long_tuned_10` 是 **8 秒**条件，不要说成现场的 3 秒结果。另有 3 秒条件的图在 `results/guide2_*`。
+
+考官指定新位置时，先要到 **Gazebo 世界坐标**，在同一终端输入（下面的 `BOX_X`、`BOX_Y` 换成考官给的数；两次保持条件相同）：
+
+```bash
+BOX_X=-1.3
+BOX_Y=-3.45
+RANDOM_OUT="results/random_live_$(date +%Y%m%d_%H%M%S)"
+python3 scripts/run_experiment.py --config short --runs 2 --delay 3 --world-x "$BOX_X" --world-y "$BOX_Y" --size-x .30 --size-y .30 --gui --max-preflight-attempts 4 --first-domain 190 --out "$RANDOM_OUT"
+cat "$RANDOM_OUT/summary.json"
+cat "$RANDOM_OUT/run_01/summary.json"
+cat "$RANDOM_OUT/run_02/summary.json"
+```
+
+`--runs 2` 会依次启动两次独立仿真；每次结束后才进入下一次，不要另外开终端发车。2026-11-22 用示例坐标彩排时，第一次成功、第二次失败；这仅验证现场输入与记录流程，不能代替考官指定的随机坐标。若考官允许第一次后调整参数，应改用两个 `--runs 1` 的新输出目录，并分别保存两次配置，不把它们当作同配置重复试验。
+
+展示事先完成的两方案十次数据、调优十次数据和四指标图：
+
+```bash
+cat results/short_10/summary.json results/long_10/summary.json results/long_tuned_10/summary.json
+xdg-open results/guide2_four_metrics.png
+xdg-open results/guide2_trajectory_comparison.png
+```
+
+三份 `summary.json` 是原先的 **8 秒**批次；两张 `guide2_` 图片是之后的 **3 秒**批次。讲解时先指出图与表属于不同条件，不要拼成同一组统计。两方案采用同一 RPP 控制器的 `0.30 m` 和 `0.80 m` 前视距离；原题允许这种“同一控制器、两套极端参数”的比较。成功率用各组全部十次；平均耗时、额外路径、平滑度只用成功轨迹。额外路径的题目定义是实际轨迹长度减**无障碍实际路线**长度，不能用起终点直线距离冒充。
+
+最后现场复现已观察过的较难条件。世界 `(-1,-3.6)`、`0.35 m` 箱体在 2026-11-22 彩排中使目标失败；独立重试有随机性，若成功也要照实展示。
+
+```bash
+FAIL_OUT="results/failure_live_$(date +%Y%m%d_%H%M%S)"
+python3 scripts/run_experiment.py --config short --runs 1 --delay 3 --world-x -1 --world-y -3.6 --size-x .35 --size-y .35 --gui --max-preflight-attempts 4 --first-domain 200 --out "$FAIL_OUT"
+cat "$FAIL_OUT/run_01/summary.json"
+cat "$FAIL_OUT/run_01/trial.log"
+```
+
+脚本在有效导航失败时可能以退出码 1 结束；`run_01/summary.json` 和 `trial.log` 才是判读依据。起跑前预检失败会保留在 `attempts/` 并重试，不计为避障试次。
