@@ -234,7 +234,17 @@ python3 ../M3-2/scripts/drive_route.py --straight-test 0.3 --straight-speed 0.1
 ros2 topic echo /amcl_pose --once --field pose.pose.position
 ```
 
-请考官在 RViz **白色已知空闲区**给出地图目标 X、Y 和终点朝向（度），并确认计划路线超过 5 m、包含转弯。黑色是障碍，灰色是未知区；不能把目标点放在其中。例如 `(7, 7)` 在本项目正式地图中是黑色占据格，不能作为有效目标。由 B 逐项输入考官给的数字，然后运行：
+请考官在 RViz **白色已知空闲区**给出地图目标 X、Y 和终点朝向（度），并确认计划路线超过 5 m、包含转弯。黑色是障碍，灰色是未知区；不能把目标点放在其中。例如 `(7, 7)` 在本项目正式地图中是黑色占据格，不能作为有效目标。
+
+**先查坐标与可规划性，车不会移动。** RViz 的 `Fixed Frame` 应为 `map`。在终端 B 先运行 `ros2 topic echo /clicked_point --once --field point`，再在 RViz 工具栏选 `Publish Point` 并点击候选白色区域；终端 B 会打印该点的地图 `x,y`。请考官确定终点朝向，按打印出的数值调用规划预检脚本，例如：
+
+```bash
+python3 scripts/check_plan.py --goal-x 7 --goal-y 8 --goal-yaw-deg 180
+```
+
+出现 `SUCCEEDED`、路径长度 `>5 m` 且在 RViz 中看到所需转弯，才进入下面的实际驾驶。出现 `NO PATH` 就换一个白色位置或朝向。该脚本默认从地图起点 `(0,0,0°)` 规划；若车已移动，在命令末尾加 `--current-start`，改从当前车位规划。**能规划不保证一定能行驶到达**，还要看控制器、定位和障碍变化。2026-11-22 实测 `(7,7,45°)` 返回 `NO PATH`，而 `(7,8,180°)` 返回 197 个路径点、15.73 m；后者只是可规划示例，并未因此证明实车已到达。
+
+由 B 逐项输入考官给的数字，然后运行：
 
 ```bash
 read -r -p '目标地图 X: ' GOAL_X
