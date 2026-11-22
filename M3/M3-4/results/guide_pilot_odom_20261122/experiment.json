@@ -1,0 +1,20 @@
+{
+  "config": "guide_short",
+  "runs": 1,
+  "out": "results/guide_pilot_odom_20261122",
+  "first_domain": 180,
+  "delay": 3.0,
+  "world_x": -1.0,
+  "world_y": -3.6,
+  "size_x": 0.35,
+  "size_y": 0.35,
+  "goal_x": 8.0,
+  "goal_y": 0.4,
+  "goal_yaw_deg": 0.0,
+  "no_obstacle": false,
+  "gui": false,
+  "max_preflight_attempts": 3,
+  "resume": false,
+  "max_new_runs": 0,
+  "config_path": "/home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-4/config/guide_short.yaml"
+}
