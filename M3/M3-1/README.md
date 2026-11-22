@@ -34,11 +34,11 @@ xdg-open "$EXAM_RESULTS/trajectory_compare.png"
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
 pwd
-ls results
+ls results/frame_aligned_repeats_01
 head -n 3 results/frame_aligned_repeats_01/per_run.csv
 ```
 
-`pwd` 应以 `M3/M3-1` 结尾，`ls` 应包含 `per_run.csv`、`summary.json`、`trajectory_compare.png`、`closed_loop_stats.md`。如果路径或文件不对，先停下检查目录，不要在别处运行脚本。
+`pwd` 应以 `M3/M3-1` 结尾，`ls` 应包含 `per_run.csv`、`summary.json`、`trajectories.png`、`per_segment.csv` 等正式结果。面向考核的 `trajectory_compare.png` 和 `closed_loop_stats.md` 位于 `results/` 目录。如果路径或文件不对，先停下检查目录，不要在别处运行脚本。
 
 ### 1. 起仿真（终端 A，保持运行）
 
@@ -66,9 +66,24 @@ ros2 topic info /cmd_vel
 
 应看到 5 个话题，`/cmd_vel` 类型为 `geometry_msgs/msg/Twist` 且 `Subscription count: 1`。此时 `Publisher count: 0` 正常：驾驶脚本尚未启动。`/odom` 是轮里程计估计，`/gazebo/model_states` 是仿真真值。若没有 `/odom`，回 A 查控制器日志，不要继续试跑。老师要看消息帧名时，在 B 执行 `ros2 topic echo /odom --once`，指出 `frame_id: odom` 和 `child_frame_id: base_footprint`。
 
+本机现场验证时得到的正常输出如下。现场不要求数字和排版逐字相同，但 5 个话题、消息类型和一个订阅者必须存在：
+
+```text
+/cmd_vel
+/gazebo/model_states
+/odom
+/tf
+/tf_static
+Type: geometry_msgs/msg/Twist
+Publisher count: 0
+Subscription count: 1
+```
+
+这里 `Publisher count: 0` 表示此刻还没有驾驶程序发送速度；`Subscription count: 1` 表示阿克曼控制器已经在等待 `/cmd_vel`，因此可以进入下一步。
+
 ### 3. 现场跑一圈并自动记录（终端 B；A 继续运行）
 
-在 **B** 输入下面三行。`DEMO_OUT` 仅在 B 中有效；日期时间后缀创建新日志目录，避免覆盖正式数据。运行时不要暂停 Gazebo，也不要按 `Ctrl+C`。
+继续使用刚才验证话题的**同一个终端 B**，输入下面三行。`DEMO_OUT` 是 shell 变量，只保存在这个终端中；日期时间后缀创建新日志目录，避免覆盖正式数据。运行时不要暂停 Gazebo，也不要按 `Ctrl+C`。
 
 ```bash
 DEMO_OUT="logs/live_demo_$(date +%Y%m%d_%H%M%S)"
@@ -77,6 +92,13 @@ python3 scripts/run_trials.py --runs 1 --side 2.0 --radius 0.65 --speed 0.1 --ou
 ```
 
 等约 **69 秒仿真时间**，终端 B 应显示 `Run 1/1: complete` 并回到 `$`。向考官解释：阿克曼车不能原地转；外框边长 2 m、圆弧半径 0.65 m，每段直线 `2−2×0.65=0.70 m`，直行时间 `0.70/0.1=7.0 s`；每个 90° 转弯时间 `π×0.65/(2×0.1)≈10.2 s`，一圈约 68.8 s。程序按仿真时间发命令，同时录两路数据，Gazebo 真值只用于对照、没有参与驾驶控制。
+
+正常结束时会看到类似下面两行；必须等 `$` 提示符重新出现后再检查文件：
+
+```text
+[INFO] [...] [square_driver]: Run complete; zero velocity command sent
+Run 1/1: complete, ... odom and ... truth rows
+```
 
 ### 4. 检查现场新数据（终端 B）
 
