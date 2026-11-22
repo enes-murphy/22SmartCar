@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--goal-y", type=float, default=3.0)
     parser.add_argument("--goal-yaw-deg", type=float, default=90.0)
     parser.add_argument("--min-travel", type=float, default=5.0)
+    parser.add_argument("--from-current", action="store_true",
+                        help="allow a later leg to start away from the launch pose")
     parser.add_argument("--timeout", type=float, default=180.0,
                         help="maximum wall-clock seconds after goal acceptance")
     args = parser.parse_args()
@@ -67,7 +69,7 @@ def main():
             raise RuntimeError("No /odom received")
         start = last_odom.pose.pose.position
         print(f"Odom start: x={start.x:.2f}, y={start.y:.2f}", flush=True)
-        if not (-0.5 <= start.x <= 0.5 and abs(start.y) <= 0.5):
+        if not args.from_current and not (-0.5 <= start.x <= 0.5 and abs(start.y) <= 0.5):
             raise RuntimeError("Car is not near the start; restart the launch first")
         if not client.wait_for_server(timeout_sec=15.0):
             raise RuntimeError("/navigate_to_pose is unavailable")
