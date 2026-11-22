@@ -10,6 +10,7 @@ from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
 from nav2_common.launch import ReplaceString
 
 
@@ -86,7 +87,8 @@ def generate_launch_description():
             "params_file": nav_params,
             "use_sim_time": "true",
             "autostart": "true",
-            "use_composition": "False",
+            "use_composition": "True",
+            "container_name": "nav2_container",
         }.items(),
         condition=IfCondition(LaunchConfiguration("navigation")),
     )
@@ -98,11 +100,22 @@ def generate_launch_description():
         parameters=[{"use_sim_time": True}],
         condition=IfCondition(LaunchConfiguration("rviz")),
     )
+    nav_container = ComposableNodeContainer(
+        name="nav2_container",
+        namespace="",
+        package="rclcpp_components",
+        executable="component_container_mt",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+        condition=IfCondition(LaunchConfiguration("navigation")),
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument("rviz", default_value="false"),
         DeclareLaunchArgument("gui", default_value="true"),
         DeclareLaunchArgument("navigation", default_value="false"),
         gazebo,
+        nav_container,
         robot_state_publisher,
         RegisterEventHandler(OnProcessExit(target_action=spawn, on_exit=[joint_states])),
         RegisterEventHandler(OnProcessExit(target_action=joint_states, on_exit=[drive])),

@@ -9,28 +9,8 @@ M3-2 激光 SLAM 建出可导航地图
   ↓ world、map.pgm、map.yaml
 M3-3 在该地图上定位并自主导航
   ↓ Nav2 配置、一键 launch、调优数据
-M3-4 导航途中加入动态障碍并比较局部控制参数
+M3-4 导航途中加入动态障碍并比较规划器
 ```
-
-## 四题分别在解决什么
-
-| 题目 | 输入与关键软件 | 要得到的结果 | 下一题如何使用 |
-| --- | --- | --- | --- |
-| [M3-1 坐标系与里程计](M3-1/README.md) | ROS 2 Humble、Gazebo、阿克曼车模、`ros2_control` | 能接收速度指令的车、`/odom`、TF 树、十圈误差统计 | 为建图提供车模、激光安装关系和里程计 |
-| [M3-2 激光 SLAM](M3-2/README.md) | 自建 Gazebo 场景、`/scan`、Slam Toolbox | `map.pgm`/`map.yaml`、建图录包、墙和窄门的定量评价 | 为定位与导航提供固定地图 |
-| [M3-3 自主导航](M3-3/README.md) | 保存的地图、AMCL、Nav2、RViz | 一键启动、可转弯的目标导航、参数前后与三次运行证据 | 为动态障碍实验提供基准导航链 |
-| [M3-4 动态避障](M3-4/README.md) | 同一导航链、延迟出现的 Gazebo 箱体、重复试验 | 两套前视参数的对比、调优、失败分析 | 检验导航面对新障碍时的能力和边界 |
-
-几个名称不要混淆：Gazebo 是物理仿真和真值来源；`/odom` 是轮子/控制器推算的相对运动；SLAM 在移动时建立 `map`；AMCL 在已保存的地图上定位；Nav2 根据目标规划与控制；RViz 用于查看地图、路径和代价地图。Gazebo 真值只用于实验后评价，不作为 SLAM 或 Nav2 的输入。
-
-## 本仓库的证据在哪里
-
-- M3-1 的十圈统计在 [`M3-1/results/closed_loop_stats.md`](M3-1/results/closed_loop_stats.md)，原始逐圈 CSV 在本机 `M3-1/logs/frame_aligned_repeats_01/`。
-- M3-2 的正式地图在 [`M3-2/maps/map.yaml`](M3-2/maps/map.yaml) 和 [`M3-2/maps/map.pgm`](M3-2/maps/map.pgm)，完整评价与单变量对比见 [`M3-2/report.md`](M3-2/report.md)。体积较大的原始 rosbag 留在本机 `M3-2/bags/formal_02/`，未上传 Git。
-- M3-3 的运行结果与参数快照在 `M3-3/results/nav_pilot_01/`、`nav_tuned_pilot_01/` 和 `nav_repeats_tuned/`；固定目标三次成功不等于现场随机目标已完成。
-- M3-4 的正式固定场景结果在 [`M3-4/report.md`](M3-4/report.md) 和 `M3-4/results/{short_10,long_10,long_tuned_10}/`。每组十次，是同一局部控制器的两套前视参数及一次调优。3 秒后注入和考官指定位置另属现场验证，不能拿历史 8 秒固定场景数据冒充。
-
-进度勾选表示仓库已有对应题目的实现与报告；是否满足某次考核的现场随机任务，仍要按各题 README 的展示要求当场验证。阅读时先看每题的“目标、过程、指标解释”，再进入其“按展示指南现场执行”章节。
 
 ## 学习原则
 

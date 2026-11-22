@@ -189,21 +189,9 @@ def main():
         stopper.publish(Twist())
         for _ in range(5):
             rclpy.spin_once(node, timeout_sec=0.05)
-        # Costmap footprint publications can lag the last warmup command by
-        # several update cycles. Give both topics a bounded chance to report
-        # the new pose before calling this launch stale.
-        footprint_after = {}
-        footprint_deadline = time.monotonic() + 3.0
-        while time.monotonic() < footprint_deadline:
-            rclpy.spin_once(node, timeout_sec=0.1)
-            footprint_after = {name: next((r[4] for r in reversed(footprint_rows)
-                                           if r[1] == name), None)
-                               for name in ('local', 'global')}
-            if all(footprint_before[name] is not None and
-                   footprint_after[name] is not None and
-                   footprint_after[name] - footprint_before[name] >= 0.12
-                   for name in ('local', 'global')):
-                break
+        footprint_after = {name: next((r[4] for r in reversed(footprint_rows)
+                                       if r[1] == name), None)
+                           for name in ('local', 'global')}
         for name in ('local', 'global'):
             a, b = footprint_before[name], footprint_after[name]
             if a is None or b is None or b - a < 0.12:

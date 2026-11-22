@@ -1,122 +1,246 @@
-# M3-2 激光 SLAM 建图
+# M3-2｜SLAM 建图：让地图能用于导航
 
-本题要自建含长走廊、回环和一个难点的 Gazebo 世界，用激光 SLAM 走完整圈，保存标准 `map.pgm` 与 `map.yaml`，并用墙体直线度、回环一致性和导航可用性三组证据评价地图。Gazebo 真值只用于离线评价，不参与建图。
+本阶段复用 M3-1 中已经验证的阿克曼小车、`/scan`、`/odom` 与 TF，使用
+`slam_toolbox` 在自建 Gazebo 世界中生成标准占据栅格地图，并用数据评价地图质量。
 
-## 场景和实现
+## 本题最终要证明什么
 
-`worlds/scene.world` 的外墙内边界为 x=±7 m、y=±5 m；中央障碍区边界为 x=±5 m、y=±3 m。环形走廊宽约 2 m，上下直段约 10 m，绕中央障碍一圈后返回起点形成回环。右侧自行设计的窄门理论净宽 1.2 m，用来检验地图栅格、墙体厚度和导航膨胀后是否仍有通道。
+1. 自建世界同时包含长走廊、回环路径和一个有明确目的的难点。
+2. SLAM 只使用激光、里程计和 TF，能够生成 `map → odom` 并保存标准地图。
+3. 地图质量有墙体直线度、回环一致性和导航可用性三组定量证据。
+4. 参数选择与雷达特性、车辆速度和场景几何有对应关系。
 
-`scripts/drive_route.py` 使车沿走廊巡场，直线段用两侧激光墙距纠偏。`smart_car_slam` 使用 `slam_toolbox`；参数在 `config/slam_params.yaml`。地图分辨率 0.05 m/格，1.2 m 门约占 24 格；雷达 360 线、10 Hz、有效距离 0.12–8 m，因此 `max_laser_range` 不超过 8 m。正式地图在 `maps/map.pgm` 和 `maps/map.yaml`，原始录包在 `bags/formal_02/`。
+## 当前进度
 
-## 地图质量证据
+- [x] 读取原题并拆解硬性要求。
+- [x] 安装并验证 ROS 2 Humble、Gazebo、RViz、rosbag2、`slam_toolbox` 和地图保存工具。
+- [x] 设计满足尺寸约束的环形世界及 1.2 m 窄门难点。
+- [x] 创建 `smart_car_slam` 包、SLAM 参数与统一启动文件。
+- [x] 在 Gazebo 中实测世界、小车、控制器、雷达和 `map → odom`。
+- [x] 编写并试走可复现巡场路线。
+- [x] 录制 rosbag，完成正式建图并保存 `map.pgm`、`map.yaml`。
+- [x] 自动评价墙体直线度、回环一致性和窄门几何可用性。
+- [x] 完成同录包的回环开关单变量对比实验和最终报告。
 
-`results/quality_report.md` 基于正式地图和 rosbag：四段中央墙的拟合 RMS 偏差约 0.004–0.008 m；检查区域内未见明显分离的双层墙，横截面最大占据跨度 0.10 m；窄门中央已知空闲宽度至少 23 格，即 1.15 m。墙体跨度只是最终地图重影的代理指标，**不能单凭这张图证明 slam_toolbox 内部的回环约束已经触发**。门宽还需在 M3-3 中扣除车体和膨胀区。
+最终报告见 [report.md](report.md)：同一份正式录包重放两次，只改变
+`do_loop_closing`，并比较墙体直线度、墙体跨度和窄门空闲宽度。
+`results/loop_closure_compare/` 保留两张地图、配置快照、原始指标与并排图。
 
-`results/quality_regions.png` 标出取样位置。`results/loop_closure_compare/maps_side_by_side.png` 和同目录的 `metrics.json` 是相同 rosbag 重放、仅切换回环参数的对比；两张图须连同参数差一起解释。正式地图与比较地图不是同一趟现场新驾驶。
+## 世界设计
 
-## 实际工作过程与各程序的作用
+世界平面由外墙和中央矩形障碍区组成：
 
-1. **检查输入链。** M3-1 的车模和控制器提供 `/odom`、`/tf` 与 `lidar_link` 上的 `/scan`。Slam Toolbox 用激光扫描、里程计和 TF 估计车在地图上的位置，并持续发布 `/map`；Gazebo 提供物理场景。我们曾用 `ros2 topic list`、`ros2 topic echo /scan --once --field header.frame_id` 和 `ros2 topic echo /map --once --field info` 确认输入输出确实连通，扫描坐标系为 `lidar_link`，地图分辨率是 0.05 m/格。
-2. **设计可检验的世界。** 自建 [`worlds/scene.world`](worlds/scene.world) 含环形走廊、中央障碍和右侧窄门。长直墙便于量化直线度；绕中央障碍回到起点可检验闭合一致性；窄门检验地图是否保留可通行空间。地图的 `map` 坐标原点由 SLAM 估计，不能把 Gazebo 世界坐标、`odom` 和 `map` 的数值直接当成同一坐标。
-3. **先发现驾驶问题，再用传感器修正。** 起初按固定时长开环直行，第一段偏向墙体；另一次 3 m、0.10 m/s 的直行从真值约 `(-4.995,-4.002)` 到 `(-1.994,-3.668)`，横向偏离约 0.33 m。通过 [`scripts/inspect_scan.py`](scripts/inspect_scan.py) 检查前、左、右激光距离，再在直线段用左右墙距差给小角速度修正。3 m 的居中测试结束在约 `(-1.996,-3.999)`，较快的 0.20 m/s 测试也在约 `(-1.992,-4.004)`。这证明了该直段的反馈效果，不能推论所有场景都会居中成功。
-4. **完整巡场并保存原始证据。** 车沿环形走廊走完一圈，`ros2 bag` 录下 `/clock`、`/cmd_vel`、`/odom`、`/scan`、`/tf`、`/tf_static`、`/map`、`/map_metadata` 和 `/gazebo/model_states`。录包结束日志显示 `Recording stopped` 后，再用 `map_saver_cli` 从 `/map` 保存标准 PGM 图像与 YAML 元数据。最终交付的是 [`maps/map.pgm`](maps/map.pgm) 和 [`maps/map.yaml`](maps/map.yaml)；`pilot_01`、`wall_follow_pilot` 是排查过程中的早期地图，不应当作正式结果。原包约 50 MiB，保留本机而未提交 Git。
-5. **离线评价与单变量试验。** [`scripts/eval_map.py`](scripts/eval_map.py) 对正式地图和 bag 做墙体、闭合与窄门评价。然后 [`scripts/prepare_slam_replay.py`](scripts/prepare_slam_replay.py) 从同一个 bag 制作可重放输入，排除旧 `/map`、Gazebo 真值，并从 `/tf` 移除原有的 `map→odom`，避免新建图受旧结果污染；两次重放仅将 `do_loop_closing` 从 `true` 改成 `false`。结果、配置和详细局限见 [`report.md`](report.md)。
+```text
+       外墙内边界 y = +5 m
+  ┌────────────────────────────┐
+  │                            │
+  │   ┌────────────────────┐   │
+  │   │                    │   │
+  │   │   中央障碍区       │ 窄│  右侧走廊
+  │   │    10 m × 6 m      │ 门│  宽 2 m
+  │   │                    │   │
+  │   └────────────────────┘   │
+  │                            │
+  └────────────────────────────┘
+       外墙内边界 y = -5 m
+```
 
-## 三类质量指标分别回答什么
+- 外墙内边界：`x = ±7 m`、`y = ±5 m`。
+- 中央障碍区边界：`x = ±5 m`、`y = ±3 m`。
+- 环形走廊宽度：`2.0 m`。
+- 上下长直段：约 `10 m`，满足原题“长走廊长度 ≥ 8 m”。
+- 计划路线中心线：水平段 `y = ±4 m`，竖直段 `x = ±6 m`。
+- 圆角半径：`1.0 m`，高于 M3-1 算出的车辆理论下限约 `0.575 m`。
+- 出生点：`(-5, -4)`，朝向东，走一圈后回到同一位置和朝向。
 
-| 指标 | 正式地图的结果 | 能说明什么；不能说明什么 |
-| --- | --- | --- |
-| 墙体直线度 | 中央北、南、西、东墙拟合 RMS 分别约 0.007、0.004、0.008、0.007 m | 这些是选定墙段的栅格点相对拟合直线的离散程度；不是地图绝对定位误差。 |
-| 回到起点的一致性 | 真值首尾距离 0.087 m，地图坐标下融合位姿首尾距离 0.084 m；所查墙段最大占据跨度 0.10 m | 可描述这次路线的首尾闭合和最终地图重影；不能单凭它证明内部发生了回环图优化。 |
-| 窄门导航空间 | 中央连续已知空闲至少 23 格，即 1.15 m | 表示原始地图在门口留下空闲栅格；还须考虑车身宽度、定位误差和代价地图膨胀。 |
+### 自定难点：1.2 m 窄门
 
-同一包的回环开/关对比中，四墙加权 RMS 为 **0.0079 / 0.0089 m**，所查墙段最大占据跨度为 **0.10 / 0.20 m**，门口已知空闲宽为 **1.15 / 1.10 m**。斜杠前为开启、后为关闭。此配对支持“这一次重放开启配置在这些综合指标上较好”；有的单段墙恰好相反，且每组只重放一次、没有直接记录回环事件。不要把参数开关本身说成回环事件已触发的证据，也不要把这组地图说成两次独立实车驾驶。
+右侧 2 m 宽走廊中加入两块相向挡墙，把局部净宽缩小为 `1.2 m`。这个难点用于检查：
 
-## 按展示指南现场执行
+1. 5 cm/格的地图能否清楚保留窄门；理论宽度为 `1.2 / 0.05 = 24` 格。
+2. 激光噪声和地图墙体厚度是否在门口形成伪障碍。
+3. 加入车辆轮廓与安全膨胀后，M3-3 是否仍有可导航通道。
 
-**考前｜终端 A。** 在 M3-2 目录构建，确认笔记本离线仍能启动 Gazebo；预热一次后按 Ctrl+C 退出。准备 `bags/formal_02/`、地图和提前录好的建图过程录屏。
+它不是普通障碍物，而是有明确数值验收条件的导航瓶颈。
+
+## SLAM 参数依据
+
+配置位于 `config/slam_params.yaml`，当前初始值如下：
+
+| 参数 | 初始值 | 依据 |
+| :-- | --: | :-- |
+| `resolution` | 0.05 m | 1.2 m 窄门对应 24 格，精度与文件规模平衡 |
+| `min_laser_range` | 0.12 m | 与车模雷达有效下限一致 |
+| `max_laser_range` | 8.0 m | 不超过车模雷达最大量程 |
+| `minimum_time_interval` | 0.10 s | 雷达为 10 Hz，不人为降到默认的 2 Hz |
+| `minimum_travel_distance` | 0.10 m | 直线约每 10 cm 加一个位姿节点 |
+| `minimum_travel_heading` | 0.05 rad | 转向约每 2.9° 加一个位姿节点 |
+| `loop_search_maximum_distance` | 4.0 m | 返回起点附近时允许搜索回环 |
+
+这些是有依据的起始配置，不预先宣称是最优值。正式路线与地图数据出来后再调参，
+并且一次只改变一个变量。
+
+## 工程结构
+
+```text
+M3-2/
+├── worlds/scene.world
+├── config/slam_params.yaml
+├── src/smart_car_slam/
+│   ├── launch/sim_slam.launch.py
+│   ├── CMakeLists.txt
+│   └── package.xml
+├── maps/
+├── bags/                  # 原始大文件不提交 Git
+├── scripts/
+├── results/
+└── README.md
+```
+
+M3-2 是单独的 colcon 工作空间，但运行时依赖 M3-1 已安装的
+`smart_car_description`。因此构建顺序必须是系统 ROS → M3-1 → M3-2。
+
+## 当前阶段的构建与首次验证
 
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
 source /opt/ros/humble/setup.bash
 source ../M3-1/install/setup.bash
-colcon build --base-paths src --symlink-install
+colcon build --base-paths src --packages-select smart_car_slam
 source install/setup.bash
 ros2 launch smart_car_slam sim_slam.launch.py
 ```
 
-**1 看自建世界｜终端 A；文本编辑器或 Gazebo 窗口。**
+第一次启动默认不打开 RViz，先单独验证 Gazebo 和 ROS 数据链。后续可用
+`rviz:=true` 启动可视化；工程自己的 `config/mapping.rviz` 已设置俯视视角与
+`/map` 显示。已有仿真运行时，可在另一终端单独执行：
 
 ```bash
-gedit worlds/scene.world
+rviz2 -d config/mapping.rviz --ros-args -p use_sim_time:=true
 ```
 
-指给考官看：约 10 m 的长直段、绕中央障碍的回环、右侧 1.2 m 窄门；说明窄门预期使激光测量和占据栅格边缘出现厚度或伪影，实际评价见质量报告。
+实测前不把“构建成功”当成“建图成功”。
 
-**2 起 SLAM 仅验证可运行｜终端 A，保持运行。** 关闭可能存在的旧仿真，执行：
+## 最终交付物
 
-```bash
-ros2 launch smart_car_slam sim_slam.launch.py
+```text
+worlds/scene.world
+config/slam_params.yaml
+maps/map.pgm
+maps/map.yaml
+scripts/drive_route.py
+scripts/eval_map.py
+results/quality_report.md
+results/*.png
+README.md
 ```
 
-**终端 B** 新开后加载环境，再检查话题：
+正式实验还会记录 `/odom`、`/scan`、`/tf`、`/tf_static` 与 `/map`。禁止使用
+`/gazebo/model_states` 修正 SLAM；Gazebo 真值最多只能作为独立的事后评价依据。
+
+## 正式试次 02
+
+使用激光居中路线完成一圈。原始录包 `bags/formal_02/` 保留在本机，
+约 50.2 MiB、105533 条消息，含 `/odom`、`/scan`、`/tf`、`/tf_static`、
+`/map`、`/clock`、`/cmd_vel` 和仅供事后评价的 `/gazebo/model_states`。
+保存 `maps/map.pgm` 与 `maps/map.yaml`，尺寸 282 × 203 格，分辨率 0.05 m/格。
+根据 bag 中驾驶首尾附近的 Gazebo 真值，起点约 `(-4.997671, -3.979444)`，
+终点约 `(-4.911313, -3.985065)`，位置闭合误差约 `0.08654 m`；
+航向从约 `-1.482°` 到等效 `+6.288°`，相差约 `7.77°`。
+这些是车辆真实轨迹的闭合指标，不是地图墙体直线度或 SLAM 回环指标。
+
+运行离线评价（不需要 Gazebo）：
 
 ```bash
-cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
 source /opt/ros/humble/setup.bash
-source ../M3-1/install/setup.bash
-source install/setup.bash
-ros2 topic list | grep -E '^/(scan|odom|map|tf)$'
+python3 scripts/eval_map.py
 ```
 
-展示提前录好的操作录屏和 `ros2 bag info bags/formal_02`；录屏是建图过程证据，不替代**现场加载保存地图**。验证后在 A 按 Ctrl+C，等 SLAM 和 Gazebo 完全退出，避免两个 `/map` 发布者。
+脚本读取地图和本地 rosbag，生成 `results/quality_report.md`。它对中央四条墙边
+避开角点拟合直线，东边还避开自建窄门，报告 RMS 和 95% 残差；
+取墙体横截面跨度检查明显双层重影；对门中央连续已知空闲格计数；
+合成 `map→odom` 与 `/odom` 位姿计算地图坐标系下的首尾闭合距离。
+RMS 小于单格尺寸只是多个栅格点拟合的残差，不代表绝对位置有毫米精度。
+最终地图未显双墙、首尾接近，也不能单凭它们证明 SLAM 内部的回环约束触发。
+完整数值和局限见 `results/quality_report.md`。
 
-**3 现场从保存文件加载地图｜终端 A，保持运行。** 在 M3-2 目录执行指南指定的 `map_server` 方式，文件名用本机绝对路径：
+## 巡场路线预览
 
-```bash
-ros2 run nav2_map_server map_server --ros-args -p "yaml_filename:=$PWD/maps/map.yaml"
-```
-
-终端 A 停在 `Waiting on external lifecycle transitions to activate`、没有回到命令提示符是**正常状态**：这是一个持续运行的服务器，不是在编译或卡死。不要在 A 继续输入命令，也不要先按 Ctrl+C。它是生命周期节点，单独启动后还需在 **终端 B**（前一步已经加载环境）执行：
-
-```bash
-ros2 lifecycle get /map_server
-ros2 lifecycle set /map_server configure
-ros2 lifecycle set /map_server activate
-ros2 lifecycle get /map_server
-ros2 topic info /map
-timeout 8 ros2 topic echo /map --once --field info --qos-durability transient_local
-```
-
-生命周期状态应从 `unconfigured` 变为 `active`；A 应打印读取 `map.pgm`、尺寸 `282 X 203`、分辨率 `0.05 m/cell`。`/map` 是只发布一次并保留最后一条的地图主题，迟到的查看者要使用 `Transient Local` QoS；若 `echo` 在 8 秒内没收到消息，先用 `ros2 topic info -v /map` 确认发布者和 Durability，再看 RViz 的 Map 显示设置，不要让诊断命令无限等待。**终端 C** 新开 Ubuntu 终端，加载 ROS 后打开 RViz：
+`scripts/drive_route.py` 复用 M3-1 已验证的 ROS 速度发布和仿真时钟逻辑。
+从 `(-5, -4)` 朝东出发，依次走 `10、6、10、6 m` 四段直线，每段后以
+`1.0 m` 半径左转 90°。直线初始速度 `0.20 m/s`，弯道 `0.10 m/s`，
+一圈理论耗时约 `222.8` 仿真秒。先用下面的命令只查看分段，不驱动车辆：
 
 ```bash
-cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
 source /opt/ros/humble/setup.bash
-rviz2 -d config/saved_map.rviz
+python3 scripts/drive_route.py --dry-run
 ```
 
-在 RViz 中确认 Fixed Frame 为 `map`、Map 话题为 `/map`、Map 显示的 Durability Policy 为 `Transient Local`，指给考官看长墙、回环区域和窄门。工程的 `config/saved_map.rviz` 专门用于读取 `map_server` 保留的静态地图；实时建图仍使用 `config/mapping.rviz`。此处显示的是从磁盘 `map.pgm`/`map.yaml` 加载的地图，并非重新建图。
+脚本采用按时间控制的开环路线，实际位置会受轮式里程计和物理接触误差影响。
+正式运行前需检查起点、控制器状态；首圈观察是否擦墙或偏离窄门中心。
 
-**4 看定量质量和单变量对比｜终端 B；图像窗口。**
+### 首圈试走（pilot_01）
 
-```bash
-cat results/quality_report.md
-cat results/loop_closure_compare/metrics.json
-xdg-open results/quality_regions.png
-xdg-open results/loop_closure_compare/maps_side_by_side.png
-```
+8 段驾驶指令均完成，Slam Toolbox 生成的地图已保存为 `maps/pilot_01.pgm`
+和 `maps/pilot_01.yaml`（283 × 202 格，0.05 m/格）。Gazebo 模型真值的
+终点为 `(-4.955176, -4.048592)`、航向 `0.010994 rad`；相对规划起点
+`(-5, -4, 0)` 的位置误差约 `0.0661 m`，航向误差约 `0.63°`。
+这是路线的终点闭合误差，不等同于 SLAM 回环一致性；试走期间没有录制 rosbag。
 
-按“墙直度 → 是否双墙/回环一致性 → 窄门已知空闲宽度”讲三组数据，并说清对比实验只改变回环开关。结束时先关 RViz，在 A 按 Ctrl+C 关闭地图服务器。
+### 正式试次 01：第一段碰撞，保留诊断数据
 
-### 提前录制建图过程（Ubuntu 自带录屏）
+原始录包保存在本地 `bags/formal_01/`（约 49 MiB，不提交 Git），包含
+`/clock`、`/cmd_vel`、`/odom`、`/scan`、`/tf`、`/tf_static`、`/map` 和
+`/map_metadata`。脚本在第一段直线发送 `0.20 m/s`、`0 rad/s`；里程计在
+第 20 秒约前进 4 m，第 30 秒仅到约 4.8 m，表明车开始受阻。
+Gazebo 终点真值 `(-0.441707, -3.200778, 0.261938 rad)`，相对起点
+侧移约 `+0.799 m`、朝向偏离约 `+15.0°`，车身接触中央障碍区南侧。
+同时里程计报告 `(5.714836, -0.003172, -0.037366 rad)`，未反映实际侧移。
+这说明需要先诊断物理行驶与轮式里程计的差异；本试次不作为最终建图结果。
 
-展示指南要求**提前录好的建图过程录屏**；已有 rosbag 不能代替屏幕上的操作视频。这里重新从干净仿真录一次，不覆盖正式地图、正式 bag 和质量报告。
+### 低速 3 m 直行诊断
 
-1. 先用 Ubuntu 的 `Print Screen` 打开截图工具，切换到视频模式，录 10 秒测试；按顶部红色录制指示结束。确认文件确实出现在“视频”文件夹，再正式录制。GNOME 42 的截图工具支持录屏，当前机器的 `xdg-user-dir VIDEOS` 为 `/home/ubuntu22/视频`。
-2. **录屏用终端 A**：按本 README 开头的 `cd`、三个 `source` 命令进入环境，启动 `ros2 launch smart_car_slam sim_slam.launch.py rviz:=true`。保持 A 运行；Gazebo 显示小车在 `(-5,-4)` 附近，RViz 的地图开始只有局部。把 Gazebo 和 RViz 窗口调整到屏幕上都能看见。
-3. **录屏用终端 B**：另开 Ubuntu 终端，再执行同样的 `cd` 和三个 `source`；先运行 `python3 scripts/drive_route.py --dry-run`，确认计划约 `222.8` 仿真秒。把 B 窗口缩到屏幕一角，仍能看见日志。
-4. 点击 `Print Screen`，切换到视频模式，选**整个屏幕**并点击红色录制按钮。确认右上角出现红色计时标志后，在 B 执行 `python3 scripts/drive_route.py --wall-follow --laps 1`。该次驾驶约四分钟。录到四条直段、四个左转、`Run complete` 和 RViz 中逐渐出现的完整地图。录制期间不要打开 `map_server`；它是“现场加载已存地图”时的另一阶段。
-5. 点击顶部红色录制标志结束，在 B 执行 `xdg-user-dir VIDEOS` 找到视频文件夹；若不确定文件名，再执行 `find "$(xdg-user-dir VIDEOS)" -type f -mmin -30`。打开新视频播放检查：能看见 Gazebo 世界、RViz 地图增长和驾驶日志。确认视频文件大小不为零后，在 A 按 Ctrl+C 退出仿真。正式考核时播放这段原始录屏，再按上面步骤现场用 `map_server` 从磁盘加载地图。
+`straight_slow_02_start` 的 Gazebo 真值为
+`(-4.994644, -4.001787, 0.043661 rad)`；以 `0.10 m/s`、零转向命令
+直行 30 秒后，`straight_slow_02_end` 的真值为
+`(-1.993726, -3.667769, 0.107505 rad)`。真实侧移 `+0.334 m`，
+航向增加 `0.063844 rad ≈ 3.66°`，但里程计横向几乎为零。
+因此低速开环仍会向中央障碍区偏移；下一步需用雷达测量两侧墙距，
+为直行段提供闭环纠偏。`straight_slow_01_start` 是旧仿真碰撞后的状态，
+不可用作新试次起点。
 
-注意：现有 `bags/formal_02/`、`maps/map.*` 和质量报告对应先前的**正式试次**；这段新录屏是重新运行的过程展示，不能声称它与 formal_02 是同一趟实验。若录屏失败，可重新从新启动的仿真再试；不要在已经走过一圈的 Gazebo 状态中重复执行整圈路线。
+### 激光居中 3 m 对照试验
+
+`scripts/drive_centered_test.py` 以左右 90° 雷达墙距之差为反馈量，
+直行时用 `angular.z = clamp(0.30 × (left - right), -0.12, 0.12)` 微调转向；
+侧墙测距失效或前方障碍小于 0.5 m 时停车。以 `0.10 m/s` 行驶 3 m，
+Gazebo 真值从 `(-4.998929, -4.004224, 0.020575 rad)` 变为
+`(-1.995881, -3.998545, 0.006345 rad)`：横向偏移 `+0.005679 m`，
+对比同速开环的 `+0.334 m` 约减少 98.3%。这是一次试验，尚不能代表
+多次重复实验的均值或稳定性；正式路线速度 `0.20 m/s` 尚待验证。
+
+随后以 `0.20 m/s` 重做 3 m 居中直行：真值从
+`(-4.999718, -4.001918, 0.009025 rad)` 到
+`(-1.992433, -4.003812, -0.000883 rad)`，横向偏移 `-0.001894 m`。
+这验证了目标直线速度下的短距离效果。整圈试走可用
+`python3 scripts/drive_route.py --wall-follow`：直行段依据左右墙距纠偏，
+转弯段仍使用原定角速度；拐角暂时缺少一侧墙时保留名义直行命令。
+整圈碰撞安全性与最终地图质量仍需实测。
+
+### 第一处转角试走
+
+`python3 scripts/drive_route.py --wall-follow --first-corner` 完成 10 m 直线
+和首个 90° 左转。Gazebo 真值终点为 `(5.925619, -2.922714, 1.645839 rad)`，
+距计划 `(6, -3)` 约 `0.107 m`，朝向约 `94.3°`（计划 `90°`）。
+车辆位于右侧走廊、窄门下方。这个检查验证首个转角可通行，
+尚未验证窄门和剩余三个转角。
+
+### 激光居中整圈试走
+
+`python3 scripts/drive_route.py --wall-follow --laps 1` 完成四条直线和
+四次左转，右侧窄门处测得左右距离约 `0.60 m` 和 `0.63 m`。
+Gazebo 真实终点为 `(-4.889141, -3.982283, 0.068129 rad)`，相对规划起点
+的位置闭合误差约 `0.1123 m`，航向误差约 `3.90°`。地图保存为
+`maps/wall_follow_pilot.pgm` 和 `.yaml`（292 × 231 格，0.05 m/格）。
+地图中走廊和窄门可辨认，但长墙边缘存在厚度和局部重影，仍需正式录包后
+定量评价墙体直线度与回环一致性。

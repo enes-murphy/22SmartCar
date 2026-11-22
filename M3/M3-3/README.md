@@ -1,41 +1,33 @@
-# M3-3 自主导航与调优
+# M3-3｜自主导航与调优
 
-本题必须沿用 M3-2 的地图，用一条 launch 命令启动仿真、AMCL 和 Nav2，让阿克曼车走一条超过 5 m、至少有一个转弯的路线。考核既看现场给的新目标，也看三项参数的前后证据、三次运行和代价地图及速度诊断。
+本阶段必须使用 M3-2 产出的地图，并针对阿克曼运动约束配置 Nav2。
 
-## 实现与已有证据
+## 完成清单
 
-`smart_car_navigation` 的 `localization.launch.py` 在 `navigation:=true` 时一键启动全栈；使用 M3-2 的 `map.yaml`。AMCL 发布 `map → odom`，阿克曼控制器发布 `odom → base_footprint`，车模发布固定的 `base_footprint → base_link → lidar_link`。全局规划器是适合车式运动约束的 Hybrid-A*，局部控制器是 Regulated Pure Pursuit；车不能原地转。全局和局部代价地图包含障碍层、膨胀层及车身多边形。窄门已知空闲宽度约 1.15 m；膨胀半径、车宽和转弯半径都必须一起考虑。
+- [x] 解释 `map → odom → base_link` 的来源与含义。
+- [x] 配置 AMCL、代价地图、阿克曼适用的规划器和控制器。
+- [x] 用一条 launch 命令启动仿真、定位与 Nav2。
+- [x] 选择一条大于 5 m 且包含转弯的测试路径。
+- [x] 至少调 3 个参数，保留改前/改后证据。
+- [x] 重复 3 次，统计成功率、耗时和失败原因。
 
-现有固定目标地图坐标 `(11, 3, 90°)`，规划路径约 12.8 m，含转弯。基线一次成功，耗时 84.3 s、终点误差 0.18 m；三项参数一起修改后的试跑成功，耗时 71.1 s、终点误差 0.13 m。固定新配置的三次独立仿真均成功，耗时约 71.1、71.2、71.3 s。见 `results/nav_pilot_01/`、`results/nav_tuned_pilot_01/`、`results/nav_repeats_tuned/`。这些历史固定目标试验不能代替考官现场给的新目标。
+```text
+M3-3/
+├── config/
+├── launch/
+├── scripts/
+├── results/
+└── README.md
+```
 
-| 参数 | 基线 → 新值 | 理由与代价 |
-| --- | --- | --- |
-| `FollowPath.desired_linear_vel` | 0.15 → 0.18 m/s | 提高目标速度；可能缩短反应时间和安全余量。 |
-| `FollowPath.lookahead_dist` | 0.45 → 0.40 m | 更贴转弯路径；可能增加转向修正。 |
-| `general_goal_checker.xy_goal_tolerance` | 0.20 → 0.15 m | 要求停得更近；可能增加末段调整或失败。 |
+导航配置将以 M3-2 的真实地图尺寸和窄门宽度为依据，逐步实现和验证。
 
-三项一起改，不能把 13.2 s 耗时变化归因于其中任意一个。`src/smart_car_navigation/config/navigation.yaml` 是实际 Nav2 配置；基线和调优快照在上述结果目录。历史运行日志中也记录了曾发生的代价地图冻结、控制器进展失败和退出阶段容器报错，不能删去失败历史。
+## 第一步：用已有地图定位
 
-2026-11-22 已在这台机器补录三张独立诊断图：`results/diagnostics_correct_20261122/{global_costmap,local_costmap,cmd_vel_angular}.png`，另存有 `cmd_vel.csv`。它们由 ROS 实际话题采集，不是手画示意图。起初发现组件模式下局部代价地图误读默认参数，故一键 launch 改成普通节点模式；重新采集前实际读回 `rolling_window=true`、局部宽度 `3 m`、全局膨胀半径 `0.25 m`。这次诊断路线到地图 `(10.19,1.02)` 时 Nav2 中止，目标误差 `2.14 m`；因此这组三图是**一次失败运行的诊断证据**，不能说成新增成功记录。图中的局部地图只覆盖随车滚动的 3 m 区域，正适合解释窄处的代价约束。
-
-## 从地图到自主导航：各组件怎样接力
-
-M3-2 保存的 `map.pgm` 是占据栅格，`map.yaml` 说明分辨率、原点和图像文件。Nav2 的 `map_server` 读取这对文件，把地图作为 `/map` 发布；AMCL 将当前 `/scan` 与固定地图匹配，估计车在地图中的位置并发布动态 `map→odom`。M3-1 控制器继续给出 `odom→base_footprint`，车模补齐到 `lidar_link`。这条 TF 链断了一段，规划器就无法可靠地把激光、车位和目标放到同一个坐标系。
-
-Nav2 的全局规划器在地图和全局代价地图上计算含转弯约束的路径；Regulated Pure Pursuit 从路径选前视点，持续输出 `/cmd_vel`；阿克曼控制器把速度指令落实为车轮和转向动作。全局代价地图看较大区域，局部代价地图围绕车滚动，障碍层标记传感器看到的障碍，膨胀层给墙周围留安全余量。RViz 只负责显示和交互，它的地图“看起来正确”不能替代生命周期、TF 和控制输出检查。
-
-## 我们怎样验证并调参
-
-1. **先确认服务真的工作。** `map_server` 与 AMCL 到 `active [3]` 后，用 0.3 m 低速直行触发 AMCL 更新，观察 `/amcl_pose` 和 `map→base_footprint`。`tf2_echo` 首次短暂提示 frame 不存在、随后持续输出变换是正常的初始化过程。`planner_server`、`controller_server` 也必须为 `active [3]`。
-2. **先只规划。** `scripts/check_plan.py` 曾返回 `SUCCEEDED: 126 poses, 12.52 m path`，这是全局规划器找到了路线，不表示车已执行。随后用 `run_nav_trial.py` 发送目标、记录导航动作状态、时间和终点误差；固定历史目标为地图 `(11,3,90°)`，路线大于 5 m 且包含转弯。
-3. **给基线和新配置各留快照。** 基线一次成功，耗时 84.3 s、到点位置误差 0.18 m；三项参数同时调整后的试跑成功，耗时 71.1 s、误差 0.13 m。用固定新配置在独立仿真中重复三次，成功 3/3，成功耗时均值 71.2 s、样本标准差 0.1 s。原始摘要见 `results/nav_pilot_01/`、`nav_tuned_pilot_01/` 和 `nav_repeats_tuned/`。这些摘要将动作耗时标为墙钟秒，不能在没有进一步核对的情况下改称仿真秒；记录器总时长还含动作前后的空闲时间。
-4. **保留失败诊断。** 部分测试遇到局部代价地图未按期滚动、控制器进展失败等问题；后来把组件启动改为普通节点并读回运行参数。现存三张代价地图/角速度图来自一条最终失败的路线，能解释约束和异常，不能加入“成功三次”的分子。
-
-三项参数的作用不同：`desired_linear_vel` 从 0.15 增至 0.18 m/s，使期望行驶更快，但留给感知和制动的时间可能变少；`lookahead_dist` 从 0.45 缩至 0.40 m，让控制器更关注近处路径，可能更贴弯也可能多修正；`xy_goal_tolerance` 从 0.20 缩至 0.15 m，让“到点”判定更严格，可能延长末段调整。由于这三项**一起改**，本次 84.3→71.1 s 的变化无法分配给某一个参数；3/3 也只是这个固定目标和环境下的重复结果。真正的现场任务还需要根据新目标重新确认路线可行、起点定位正常并记录结果。
-
-## 按展示指南现场执行
-
-**考前｜终端 A。** 先在 M3-3 目录构建并预热一次 Gazebo，确认不依赖网络；预热后 Ctrl+C 关闭，不要让旧仿真和正式演示并行。
+已经确认 ROS Humble 的 `nav2_amcl`、`nav2_controller`、`nav2_planner`、
+`nav2_smac_planner` 和 `nav2_regulated_pure_pursuit_controller` 安装完成。
+`smart_car_navigation` 先提供定位启动入口，尚未启动自主导航。
+构建时它会把 M3-2 的正式 `map.yaml`、`map.pgm` 原样安装到自身 share 目录。
 
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-3
@@ -44,81 +36,158 @@ source ../M3-1/install/setup.bash
 source ../M3-2/install/setup.bash
 colcon build --base-paths src --symlink-install
 source install/setup.bash
-ros2 launch smart_car_navigation localization.launch.py gui:=true rviz:=true navigation:=true
+ros2 launch smart_car_navigation localization.launch.py gui:=false rviz:=true
 ```
 
-**1 一条命令起全栈｜终端 A，保持运行。** 预热已结束后，重新执行最后一条 `ros2 launch`。Gazebo 与 RViz 出现，等待地图、AMCL、规划器和控制器启动；不要在额外终端分别手动起三套服务。
+`gui:=false` 只关闭 Gazebo 画面，Gazebo 的物理仿真仍运行；RViz 显示已保存地图。
+先关闭此前运行的 M3-2 `sim_slam.launch.py`，避免两个 Gazebo 或两个 `map→odom` 发布者。
 
-**2 检查状态｜新开终端 B。**
+另开终端并加载 `/opt/ros/humble`、M3-1、M3-2、M3-3 四层 ROS 环境，然后检查：
 
 ```bash
-cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-3
-source /opt/ros/humble/setup.bash
-source ../M3-1/install/setup.bash
-source ../M3-2/install/setup.bash
-source install/setup.bash
+ros2 lifecycle get /map_server
 ros2 lifecycle get /amcl
-ros2 lifecycle get /planner_server
-ros2 lifecycle get /controller_server
-ros2 topic info /cmd_vel
+ros2 topic echo /map --once --field info
 ```
 
-前三项应为 `active [3]`。若 AMCL 静止时暂未产生定位更新，可先在 B 低速直行 0.3 m 后等地图变换稳定：
+前两项应为 `active`，地图分辨率应为 0.05 m。车完全静止时，AMCL 可能
+尚未发布 `/amcl_pose`；可使用 M3-2 已验证的脚本安全直行 0.3 m 来触发更新：
 
 ```bash
 python3 ../M3-2/scripts/drive_route.py --straight-test 0.3 --straight-speed 0.1
 ros2 topic echo /amcl_pose --once --field pose.pose.position
+ros2 run tf2_ros tf2_echo map base_footprint
 ```
 
-**3 考官现场给目标｜RViz 窗口。** 在地图上请考官选择距离当前车位 **大于 5 m**、包含至少一个转弯的可行目标；点击 `2D Goal Pose`，在地图点目标并拖动确定终点朝向。不要用事先固定的 `(11,3)` 冒充随机目标。观察全局路径、车体运动、到达或失败状态；在终端 B 可查 `/plan` 与 `/cmd_vel`：
+定位位置应在地图 `(0.3, 0)` 附近；TF 应持续输出变换，可按 Ctrl+C 停止查询。
+M3-2 正式 bag 的首次运动时地图位姿约为 `(0.011, 0, 0°)`，所以定位配置
+把固定起点初始化为 `(0, 0, 0°)`。后续若改变小车出生位置，须同步调整
+AMCL 初始位姿或在 RViz 使用 `2D Pose Estimate`。
 
-```bash
-ros2 topic info /plan
-ros2 topic echo /cmd_vel --once
-```
+### 坐标链由谁提供
 
-若考官给的是数值坐标、希望终端明确打印耗时和终点误差，改由 B **单独**发送目标（不要同时在 RViz 再点一次）：
+`map_server` 只把保存的地图发布给其他节点。AMCL 匹配地图和激光，发布
+`map → odom`，修正轮式里程计的累计漂移。阿克曼控制器发布
+`odom → base_footprint`；`robot_state_publisher` 发布车模中固定的
+`base_footprint → base_link` 和雷达的安装关系。完整链条是
+`map → odom → base_footprint → base_link → lidar_link`。
 
-```bash
-read -r -p '考官给的地图 X: ' GOAL_X
-read -r -p '考官给的地图 Y: ' GOAL_Y
-read -r -p '考官给的终点朝向（度）: ' GOAL_YAW
-python3 scripts/run_nav_trial.py --goal-x "$GOAL_X" --goal-y "$GOAL_Y" --goal-yaw-deg "$GOAL_YAW" --min-travel 5
-```
+## 第二步：验证导航配置能规划路径
 
-依提示输入考官给的数字。脚本要求车靠近起点；第二次现场跑目标须先在 A Ctrl+C 停止旧仿真，再重新一键启动，并重新核对定位。日志中记下每次成功/失败、动作耗时与失败原因；仅看 `SUCCEEDED` 不足以代替终点坐标检查。
+车体约 0.45 × 0.22 m；轮距 0.18 m、轴距 0.28 m，最大转角 0.5236 rad，
+按 M3-2 驾驶模型算出的最小车体中心转弯半径约 0.575 m。
+Hybrid-A* 规划器使用保守的 0.65 m，且只搜索可前进的 Dubins 路径。
+路径跟踪选择 Regulated Pure Pursuit，并关闭原地旋转。
 
-**4 展示调参和诊断｜终端 B；RViz 窗口。**
+全局与局部代价地图使用 0.05 m/格、带约 2.5 cm 余量的车体多边形和
+0.25 m 的膨胀半径。M3-2 测得的 1.15 m 门口已知空闲宽度，扣除
+0.26 m 车体宽度与两侧各 0.25 m 的膨胀范围后，名义上还剩约
+0.39 m；这只是规划前的几何估计，实际还须检查代价地图和行驶结果。
 
-```bash
-gedit src/smart_car_navigation/config/navigation.yaml
-cat results/nav_pilot_01/summary.json
-cat results/nav_tuned_pilot_01/summary.json
-cat results/nav_repeats_tuned/summary.json
-```
-
-对照上表解释三个参数的前后值、理由和已测结果。先在 B 检查实际发布的话题及类型：
-
-```bash
-ros2 topic list | grep -E 'costmap|^/plan$|^/cmd_vel$'
-ros2 topic type /global_costmap/costmap
-ros2 topic type /local_costmap/costmap
-```
-
-在 RViz 的 `Displays → Add` 中添加两个 `Map` 显示，Topic 分别选 `/global_costmap/costmap` 与 `/local_costmap/costmap`；再添加 `Path`，Topic 选 `/plan`。若实际话题类型不支持 `Map`，先依据上面的 `ros2 topic type` 结果选对应的 Nav2 Costmap 显示插件，不要凭空指定不存在的话题。车运动时，在**终端 C** 执行：
+先关闭第一步的旧 launch，再从 M3-3 目录启动：
 
 ```bash
 source /opt/ros/humble/setup.bash
-ros2 run rqt_plot rqt_plot /cmd_vel/angular/z
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+colcon build --base-paths src --symlink-install
+source install/setup.bash
+ros2 launch smart_car_navigation localization.launch.py gui:=false rviz:=true navigation:=true
 ```
 
-先打开已经录好的三张图，考官要求现场重录时，在终端 C 执行下面的采集命令，再让终端 B 发送目标；采集器在约 100 秒后保存三张图和速度 CSV。若导航提前结束，仍等采集器结束或按 Ctrl+C 并检查输出。
+`navigation:=true` 加载规划器、代价地图、路径跟踪控制器和 Nav2 生命周期管理器。
+另开终端，加载同样的四层环境后检查：
 
 ```bash
-xdg-open results/diagnostics_correct_20261122/global_costmap.png
-xdg-open results/diagnostics_correct_20261122/local_costmap.png
-xdg-open results/diagnostics_correct_20261122/cmd_vel_angular.png
-python3 scripts/capture_nav_diagnostics.py --out "results/live_diag_$(date +%Y%m%d_%H%M%S)" --seconds 100
+ros2 lifecycle get /planner_server
+ros2 lifecycle get /controller_server
+python3 scripts/check_plan.py
 ```
 
-角速度曲线也可以用 `rqt_plot` 现场观察。展示时说清楚：全局图覆盖整张地图，局部图是车旁的滚动窗口，曲线显示控制器输出；这三张现存图来自一次中途失败的诊断运行。结束时在 A 按 Ctrl+C，等仿真关闭。
+脚本仅调用 `/compute_path_to_pose` 计算从地图 `(0, 0, 0°)` 到
+`(11, 3, 90°)` 的路径，**不会向 `/cmd_vel` 发送指令**。
+隔离仿真预检得到 126 个路径点、约 12.52 m，包含第一个左转。
+这只是路径存在性的证据，不等于小车已能安全跟随路径。
+
+## 第三步：验证控制器真的跟车，并试跑转弯路线
+
+最初使用 Nav2 独立进程启动时，局部代价地图的车体轮廓停在仿真初始时刻：
+手动前进 0.3 m 后，`/odom` 已更新，代价地图轮廓时间戳和位置却未更新。
+这会造成控制器误报到点或 `Failed to make progress`。导航节点改为在
+`component_container_mt` 多线程容器中运行后，同样的 0.3 m 手动测试中，
+代价地图轮廓跟随到了约 0.45 m；轮廓使用 `base_link`，它比
+`base_footprint` 前移 0.14 m。AMCL 和地图服务器仍使用原来的启动方式。
+
+在全新隔离仿真中，`scripts/drive_nav_short.py` 从起点驶向地图
+`(2, 0, 0°)`：里程计实际移动 1.64 m，终点 `map → base_link` 为
+`(1.81, 0.02)`，距目标 0.19 m，Nav2 返回 `SUCCEEDED`。目标容差是
+0.20 m。不能直接用 `/odom` 的 `base_footprint` 坐标与 `base_link` 目标
+比较，否则会把固定的 0.14 m 车体偏移误认为导航误差。
+
+接着用 `scripts/run_nav_trial.py` 首跑地图 `(11, 3, 90°)` 目标。
+路径包含东向直行和左转，规划长度约 12.84 m。Nav2 返回 `SUCCEEDED`，
+动作耗时 84.3 秒，终点 `map → base_link` 距目标 0.18 m。
+同步记录在 `results/nav_pilot_01/`：5020 行里程计、2008 行 Gazebo 真值；
+全段轨迹长度分别为 12.422 m 和 12.418 m。录制覆盖了约 100.4 秒，
+包括动作前后的静止时间。`navigation_baseline.yaml` 保留本次参数，
+`summary.json` 保留结果。三项参数调优和固定配置的三次复测见下一节。
+
+## 第四步：三项参数调优与固定配置复测
+
+本次同时修改三项控制参数；基线和新配置的完整 YAML 分别保存在
+`results/nav_pilot_01/navigation_baseline.yaml` 与
+`results/nav_tuned_pilot_01/navigation_tuned.yaml`。运行时通过
+`ros2 param get /controller_server` 读回了新值。
+
+| 参数 | 基线 | 新值 | 预期作用 |
+| --- | ---: | ---: | --- |
+| `FollowPath.desired_linear_vel` | 0.15 m/s | 0.18 m/s | 提高直线段目标速度 |
+| `FollowPath.lookahead_dist` | 0.45 m | 0.40 m | 更贴近转弯路径 |
+| `general_goal_checker.xy_goal_tolerance` | 0.20 m | 0.15 m | 缩小到点允许误差 |
+
+同一地图目标 `(11, 3, 90°)` 的首跑对照：基线成功、动作耗时
+84.3 s、`map → base_link` 终点误差 0.18 m；新配置成功、耗时
+71.1 s、终点误差 0.13 m。耗时减少 13.2 s（约 15.7%）。两组各一次，
+且三项参数同时变化，**只能说明整套新配置在这次试跑中更快且终点更近，
+不能把变化归因于某一个参数，也不能据此估计基线的波动范围**。
+
+固定新配置后，`scripts/run_repeats.py` 每次启动新的隔离 Gazebo、
+AMCL 和 Nav2，从相同出生点运行同一目标，并分别保存启动日志、
+动作日志、里程计、Gazebo 真值和 `summary.json`。结果保存在
+`results/nav_repeats_tuned/`：
+
+| 运行 | 成功 | 动作耗时 | `map → base_link` 终点误差 | 真值轨迹长度 |
+| --- | --- | ---: | ---: | ---: |
+| 1 | 是 | 71.1 s | 0.13 m | 12.399 m |
+| 2 | 是 | 71.2 s | 0.13 m | 12.417 m |
+| 3 | 是 | 71.3 s | 0.12 m | 12.458 m |
+
+成功率 **3/3 = 100%**；成功运行的动作耗时 **71.2 ± 0.1 s**
+（均值 ± 样本标准差）；本组三次没有导航失败原因。真值轨迹长度
+平均约 **12.425 m**。这里的 100% 是三次观察结果，不能推广为
+所有场景下的可靠性保证。轨迹记录覆盖动作前后的短暂静止时间。
+
+若要重做，先关闭其他 Gazebo/导航进程，在 M3-3 目录加载四层环境并构建：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source ../M3-2/install/setup.bash
+colcon build --base-paths src --symlink-install
+source install/setup.bash
+python3 scripts/run_repeats.py --runs 3 --out results/nav_repeats_tuned_02
+```
+
+新输出目录必须不存在。脚本自动完成三次启动、录制、导航和退出；
+终端显示每次结果及总成功率，不需要手动打开三套终端。
+
+### 关闭阶段的限制
+
+三次动作均已先收到 `Goal succeeded`，保存了 CSV 和结果摘要；
+在退出仿真时，当前 ROS Humble 的 `component_container_mt` 仍可能以
+`exit code -11` 结束。独立的生命周期关停检查同样重现了这一现象，
+因此不能把退出日志中的 `ERROR` 计作导航途中失败。
+`run_repeats.py` 先请求导航与定位生命周期管理器关停，再结束 launch；
+所有隔离试验进程均已退出。后续升级或更换 Nav2 版本时应复查关闭行为。
+Nav2 上游也有[组件容器在生命周期管理器退出时崩溃的报告](https://github.com/ros-navigation/navigation2/issues/6690)；
+该报告使用 Jazzy，不能直接断定这里的 Humble 崩溃有相同根因。

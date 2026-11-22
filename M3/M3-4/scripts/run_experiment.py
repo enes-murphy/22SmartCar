@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import sys
 import time
-import psutil
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -22,26 +21,11 @@ def stop_entire_group(process):
     """Stop the launcher and any children it left after exiting itself."""
     if process is None:
         return
-    try:
-        children = psutil.Process(process.pid).children(recursive=True)
-    except psutil.NoSuchProcess:
-        children = []
     stop_group(process, timeout=5)
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
         pass
-    for child in children:
-        try:
-            child.terminate()
-        except psutil.NoSuchProcess:
-            pass
-    _, alive = psutil.wait_procs(children, timeout=3)
-    for child in alive:
-        try:
-            child.kill()
-        except psutil.NoSuchProcess:
-            pass
 
 
 def run_one(index, run_dir, config, domain, args):
@@ -57,7 +41,7 @@ def run_one(index, run_dir, config, domain, args):
         with (run_dir / 'launch.log').open('w') as stream:
             launch = subprocess.Popen(
                 ['ros2', 'launch', 'smart_car_navigation', 'localization.launch.py',
-                 f'gui:={str(args.gui).lower()}', 'rviz:=false', 'navigation:=false'], env=env, stdout=stream,
+                 'gui:=false', 'rviz:=false', 'navigation:=false'], env=env, stdout=stream,
                 stderr=subprocess.STDOUT, start_new_session=True)
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
@@ -154,9 +138,7 @@ def run_one(index, run_dir, config, domain, args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', choices=['short', 'long', 'long_tuned',
-                                             'guide_short', 'guide_long', 'guide_long_tuned'],
-                        required=True)
+    parser.add_argument('--config', choices=['short', 'long', 'long_tuned'], required=True)
     parser.add_argument('--runs', type=int, default=10)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--first-domain', type=int, default=100)
@@ -169,8 +151,6 @@ def main():
     parser.add_argument('--goal-y', type=float, default=0.4)
     parser.add_argument('--goal-yaw-deg', type=float, default=0.0)
     parser.add_argument('--no-obstacle', action='store_true')
-    parser.add_argument('--gui', action='store_true',
-                        help='show Gazebo during a live demonstration')
     parser.add_argument('--max-preflight-attempts', type=int, default=20)
     parser.add_argument('--resume', action='store_true',
                         help='continue an interrupted batch without repeating completed runs')
@@ -189,10 +169,9 @@ def main():
         saved = json.loads((args.out / 'experiment.json').read_text())
         for key in ('config', 'runs', 'first_domain', 'delay', 'world_x', 'world_y',
                     'size_x', 'size_y', 'goal_x', 'goal_y', 'goal_yaw_deg',
-                    'no_obstacle', 'max_preflight_attempts', 'gui'):
-            previous = saved.get(key, False) if key == 'gui' else saved[key]
-            if previous != getattr(args, key):
-                parser.error(f'--resume mismatch for {key}: saved {previous}')
+                    'no_obstacle', 'max_preflight_attempts'):
+            if saved[key] != getattr(args, key):
+                parser.error(f'--resume mismatch for {key}: saved {saved[key]}')
         if (args.out / 'navigation.yaml').read_bytes() != config.read_bytes():
             parser.error('--resume configuration differs from saved navigation.yaml')
     else:
