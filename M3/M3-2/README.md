@@ -121,6 +121,79 @@ rviz2 -d config/mapping.rviz --ros-args -p use_sim_time:=true
 
 实测前不把“构建成功”当成“建图成功”。
 
+## 从零复现一次成功建图（三个 Ubuntu 终端）
+
+下面是 2026-11-22 实际跑通的流程：启动 Gazebo 和 Slam Toolbox，用激光居中路线绕场地一圈，同时录制 rosbag，最后把实时 `/map` 保存成 PGM 和 YAML。**终端 A、B、C 按用途命名，不要求按字母顺序打开。** 每个终端都要自己 `source` 环境；命令都在 Ubuntu 中运行，不需要 Windows。请先结束旧的 M3-1/M3-2 Gazebo 仿真，避免两个世界或两台同名小车同时运行；已经运行过一圈的世界也要重启，才能让车回到 `(-5, -4)` 起点。
+
+### 终端 A：构建并启动仿真，整圈期间保持运行
+
+第一次运行或切换过 Git 版本后，按顺序构建车模包和建图包：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-1
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select smart_car_description
+source install/setup.bash
+cd ../M3-2
+colcon build --base-paths src --packages-select smart_car_slam
+source install/setup.bash
+ros2 launch smart_car_slam sim_slam.launch.py rviz:=true
+```
+
+`colcon` 将源码安装到工作区的 `install/`，`source` 让当前终端找到刚构建的 ROS 包。最后一行同时启动 Gazebo（物理仿真）、小车及阿克曼控制器、Slam Toolbox（用激光和里程计建图）与 RViz（显示 `/map`）。A 不返回 `$` 是正常的。等日志出现 `Successfully spawned entity [smart_car]`、两个控制器的 `Configured and activated`，再继续。Gazebo 中的小车外观很小；可以展开左侧 **Models** 查找 `smart_car`，不必只凭画面中是否看见车判断启动成功。
+
+### 终端 B：核对数据源，再开始录包，保持运行
+
+新开一个 Ubuntu 终端 B，输入：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source install/setup.bash
+ros2 topic list | grep -E '^/(cmd_vel|gazebo/model_states|odom|scan|map|tf|tf_static)$'
+ros2 topic echo /gazebo/model_states --once --field name
+ros2 topic info /map
+```
+
+应看到 `smart_car` 出现在模型名称列表，并且 `/map` 的 `Publisher count: 1`。其中 `/scan` 是激光数据，`/odom` 是轮式里程计，`/tf` 是坐标变换，`/map` 是 SLAM 生成的实时地图。若没有小车或 `/map`，回 A 检查启动日志，先不要驾驶。确认后，**仍在 B** 输入：
+
+```bash
+RUN_TAG="reproduce_$(date +%Y%m%d_%H%M%S)"
+echo "$RUN_TAG"
+ros2 bag record --use-sim-time -o "bags/$RUN_TAG" /clock /cmd_vel /odom /scan /tf /tf_static /map /map_metadata /gazebo/model_states
+```
+
+`ros2 bag` 相当于 ROS 数据录音机；带时间后缀的目录避免覆盖旧试验。看到 `Recording...`、`Sim time /clock found`，以及主要话题的 `Subscribed to topic` 后，**让 B 一直录制，不要在 B 输入驾驶命令**。`/cmd_vel` 在驾驶脚本启动后才会出现，录包程序随后会自动订阅。关于 `/tf` 的 durability 警告不妨碍其继续录制；`/gazebo/model_states` 只作为事后真值对照，不输入 SLAM。
+
+### 终端 C：开车走一圈，等程序自行停车
+
+再开一个 Ubuntu 终端 C，输入：
+
+```bash
+cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
+source /opt/ros/humble/setup.bash
+source ../M3-1/install/setup.bash
+source install/setup.bash
+python3 scripts/drive_route.py --wall-follow --laps 1
+```
+
+`--wall-follow` 用左右激光墙距修正直行方向；转弯仍按既定半径和角速度执行。路线是四段直线与四次左转，理论约 **222.8 仿真秒**。窄门处左右测距会接近 `0.6 m`。等待 `Lap 1, edge 4: finished left turn` 和 `Run complete; zero velocity command sent` 出现，C 回到 `$` 后再进入下一步。运行中不要暂停 Gazebo，也不要再启动第二个驾驶脚本。若出现碰撞或安全停车，保留日志并先排查，不要把该次当成完整地图；下一次试跑从重启 A 的仿真开始。
+
+### 回到终端 B：停止录包并保存地图
+
+先在**录包的 B** 按一次 `Ctrl+C`，等待 `Writing remaining messages from cache` 和 `Recording stopped`，B 重新出现 `$`。然后在**同一个 B** 输入：
+
+```bash
+ros2 run nav2_map_server map_saver_cli -f "maps/$RUN_TAG" --ros-args -p use_sim_time:=true
+ls -lh "maps/$RUN_TAG.pgm" "maps/$RUN_TAG.yaml"
+ros2 bag info "bags/$RUN_TAG"
+```
+
+`map_saver_cli` 将当前 `/map` 保存成占据栅格图 `.pgm` 和描述分辨率、原点的 `.yaml`；`ros2 bag info` 只检查录包的时长、消息数和话题，不会播放它。看到 `Map saved successfully`、两个地图文件存在，且 bag 中有 `/scan`、`/odom`、`/map`，才算完成这次复现。本次实测得到 **282 × 202 格、0.05 m/格**的地图和约 **245 秒、77,608 条消息**的 bag；每次运行的具体数字会略有差异。
+
+此时 A 仍在运行，可继续看 Gazebo 和 RViz。实时建图阶段由 Slam Toolbox 发布 `/map`，**不需要另外启动 `map_server`**。结束展示时，到 A 按一次 `Ctrl+C`，等仿真和图形窗口退出。下次重跑要重新启动 A，让小车回到起点。时间后缀地图和 bag 是新试验记录；原有 `maps/map.yaml`、`maps/map.pgm` 与 `bags/formal_02/` 不会被覆盖。
+
 ## 最终交付物
 
 ```text
