@@ -77,23 +77,26 @@ ros2 topic list | grep -E '^/(scan|odom|map|tf)$'
 ros2 run nav2_map_server map_server --ros-args -p "yaml_filename:=$PWD/maps/map.yaml"
 ```
 
-它是生命周期节点，单独启动后还需在 **终端 B** 执行：
+终端 A 停在 `Waiting on external lifecycle transitions to activate`、没有回到命令提示符是**正常状态**：这是一个持续运行的服务器，不是在编译或卡死。不要在 A 继续输入命令，也不要先按 Ctrl+C。它是生命周期节点，单独启动后还需在 **终端 B**（前一步已经加载环境）执行：
 
 ```bash
+ros2 lifecycle get /map_server
 ros2 lifecycle set /map_server configure
 ros2 lifecycle set /map_server activate
-ros2 topic echo /map --once --field info
+ros2 lifecycle get /map_server
+ros2 topic info /map
+timeout 8 ros2 topic echo /map --once --field info --qos-durability transient_local
 ```
 
-应看到地图分辨率约 0.05 m。**终端 C** 新开 Ubuntu 终端，加载 ROS 后打开 RViz：
+生命周期状态应从 `unconfigured` 变为 `active`；A 应打印读取 `map.pgm`、尺寸 `282 X 203`、分辨率 `0.05 m/cell`。`/map` 是只发布一次并保留最后一条的地图主题，迟到的查看者要使用 `Transient Local` QoS；若 `echo` 在 8 秒内没收到消息，先用 `ros2 topic info -v /map` 确认发布者和 Durability，再看 RViz 的 Map 显示设置，不要让诊断命令无限等待。**终端 C** 新开 Ubuntu 终端，加载 ROS 后打开 RViz：
 
 ```bash
 cd /home/ubuntu22/Documents/Codex/2026-11-09/https-github-com-blake-john-22smartcar/work/22SmartCar/M3/M3-2
 source /opt/ros/humble/setup.bash
-rviz2 -d config/mapping.rviz
+rviz2 -d config/saved_map.rviz
 ```
 
-在 RViz 中确认 Fixed Frame 为 `map`、Map 话题为 `/map`，指给考官看长墙、回环区域和窄门。此处显示的是从磁盘 `map.pgm`/`map.yaml` 加载的地图，并非重新建图。
+在 RViz 中确认 Fixed Frame 为 `map`、Map 话题为 `/map`、Map 显示的 Durability Policy 为 `Transient Local`，指给考官看长墙、回环区域和窄门。工程的 `config/saved_map.rviz` 专门用于读取 `map_server` 保留的静态地图；实时建图仍使用 `config/mapping.rviz`。此处显示的是从磁盘 `map.pgm`/`map.yaml` 加载的地图，并非重新建图。
 
 **4 看定量质量和单变量对比｜终端 B；图像窗口。**
 
@@ -105,3 +108,15 @@ xdg-open results/loop_closure_compare/maps_side_by_side.png
 ```
 
 按“墙直度 → 是否双墙/回环一致性 → 窄门已知空闲宽度”讲三组数据，并说清对比实验只改变回环开关。结束时先关 RViz，在 A 按 Ctrl+C 关闭地图服务器。
+
+### 提前录制建图过程（Ubuntu 自带录屏）
+
+展示指南要求**提前录好的建图过程录屏**；已有 rosbag 不能代替屏幕上的操作视频。这里重新从干净仿真录一次，不覆盖正式地图、正式 bag 和质量报告。
+
+1. 先用 Ubuntu 的 `Print Screen` 打开截图工具，切换到视频模式，录 10 秒测试；按顶部红色录制指示结束。确认文件确实出现在“视频”文件夹，再正式录制。GNOME 42 的截图工具支持录屏，当前机器的 `xdg-user-dir VIDEOS` 为 `/home/ubuntu22/视频`。
+2. **录屏用终端 A**：按本 README 开头的 `cd`、三个 `source` 命令进入环境，启动 `ros2 launch smart_car_slam sim_slam.launch.py rviz:=true`。保持 A 运行；Gazebo 显示小车在 `(-5,-4)` 附近，RViz 的地图开始只有局部。把 Gazebo 和 RViz 窗口调整到屏幕上都能看见。
+3. **录屏用终端 B**：另开 Ubuntu 终端，再执行同样的 `cd` 和三个 `source`；先运行 `python3 scripts/drive_route.py --dry-run`，确认计划约 `222.8` 仿真秒。把 B 窗口缩到屏幕一角，仍能看见日志。
+4. 点击 `Print Screen`，切换到视频模式，选**整个屏幕**并点击红色录制按钮。确认右上角出现红色计时标志后，在 B 执行 `python3 scripts/drive_route.py --wall-follow --laps 1`。该次驾驶约四分钟。录到四条直段、四个左转、`Run complete` 和 RViz 中逐渐出现的完整地图。录制期间不要打开 `map_server`；它是“现场加载已存地图”时的另一阶段。
+5. 点击顶部红色录制标志结束，在 B 执行 `xdg-user-dir VIDEOS` 找到视频文件夹；若不确定文件名，再执行 `find "$(xdg-user-dir VIDEOS)" -type f -mmin -30`。打开新视频播放检查：能看见 Gazebo 世界、RViz 地图增长和驾驶日志。确认视频文件大小不为零后，在 A 按 Ctrl+C 退出仿真。正式考核时播放这段原始录屏，再按上面步骤现场用 `map_server` 从磁盘加载地图。
+
+注意：现有 `bags/formal_02/`、`maps/map.*` 和质量报告对应先前的**正式试次**；这段新录屏是重新运行的过程展示，不能声称它与 formal_02 是同一趟实验。若录屏失败，可重新从新启动的仿真再试；不要在已经走过一圈的 Gazebo 状态中重复执行整圈路线。
